@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools >= 69.5.1", "setuptools_scm[toml]>=8.1.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "interpcore"
+license = { file = "LICENSE" }
+dynamic = ["version"]
+authors = [
+    { name = "F4E mechanical team", email = "davide.laghi@f4e.europa.eu" },
+]
+description = "Interpolator of different kind of loads and BC to APDL format"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: European Union Public Licence 1.2 (EUPL 1.2)",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "scikit-learn",
+    "pandas",
+    # "PyQt5",
+    # "pyvistaqt",
+]
+[project.optional-dependencies]
+dev = ["pytest", "pytest-cov", "ruff"]
+
+[project.urls]
+# Homepage = "https://github.com/Fusion4Energy"
+# Repository = "https://github.com/Fusion4Energy/EM-interpolator"
+# Documentation = "https://github.com/Fusion4Energy/EM-interpolator"
+
+[tool.setuptools_scm]
+write_to = "src/_version.py"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+# [tool.setuptools.package-data]
+# "interpcore" = ["**/*.xlsx", "**/*.txt", "**/*.csv"]
