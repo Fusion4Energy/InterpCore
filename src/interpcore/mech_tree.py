@@ -6,28 +6,35 @@ from sklearn.neighbors import KDTree
 from abc import ABC, abstractmethod
 
 
-class Tree(ABC):
+class DestinationTree(ABC):
     def __init__(
         self,
-        coordinates: np.ndarray,
+        dest_coordinates: np.ndarray,
+        src_coordinates: np.ndarray,
+        dest_ids: np.ndarray,
         name: str | None = None,
-        ids: np.ndarray | None = None,
     ):
         """Intialize the KDTree for fast search in the mechanical nodes
 
         Parameters
         ----------
-        coordinates : np.ndarray
-            point coordinates array of mesh nodes
+        dest_coordinates : np.ndarray
+            point coordinates array of destination mesh points
+        src_coordinates : np.ndarray
+            point coordinates array of source mesh points
+        dest_ids : np.ndarray
+            IDs of the destination nodes or elements
+        name : str, optional
+            Name of the tree, by default None
         """
         logging.info("Building KDTree...")
         tic = time.perf_counter()
-        self.tree = KDTree(coordinates)
+        self.tree = KDTree(dest_coordinates)
         toc = time.perf_counter()
         logging.info("Elapsed Time:")
         logging.info(toc - tic)
         self.name = name
-        self.ids = ids
+        self.ids = dest_ids
 
     def _run_query(self):
         """run the requested query by config"""
@@ -108,11 +115,3 @@ class Tree(ABC):
         logging.info(toc - tic)
 
         return interpolated, unmapped
-
-
-class DestinationTree:
-    pass
-
-
-class SourceTree:
-    pass
