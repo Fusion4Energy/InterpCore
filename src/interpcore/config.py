@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
+from interpcore.kernels import INTERPOLATION_KERNEL
 
 
 class QUERY_TYPE(Enum):
@@ -9,11 +10,11 @@ class QUERY_TYPE(Enum):
     K = "K-Nearest Neighbors"
 
 
-class INTERPOLATION_KERNEL(Enum):
-    """Kernels for interpolation, aka, how to distribute EM force on mech nodes."""
+class INTERPOLATED_LOAD_TYPE(Enum):
+    """Types of loads that can be interpolated."""
 
-    DISTANCE_WEIGHTED = "Weighted by distance"
-    FEM = "FEM system"
+    EM_FORCE = "EM-Force"
+    HEAT_FLUX = "Heat Flux"
 
 
 @dataclass
@@ -35,6 +36,8 @@ class InterpolationConfig:
         Kernel for interpolation.
     multithread : bool
         Whether to use multithreading for interpolation.
+    interpolated_load: INTERPOLATED_LOAD_TYPE
+        Type of load to interpolate.
 
     Raises
     ------
@@ -48,6 +51,7 @@ class InterpolationConfig:
     coincidence_tolerance: float
     kernel: INTERPOLATION_KERNEL
     multithread: bool
+    interpolated_load: INTERPOLATED_LOAD_TYPE
 
     def __post_init__(self):
         if self.method == QUERY_TYPE.K:
@@ -55,3 +59,11 @@ class InterpolationConfig:
                 self.param = int(self.param)
             except (TypeError, ValueError):
                 raise ValueError("Parameter for K query must be an integer.")
+
+        # assign the correct number of components depeding on the load type
+        if self.interpolated_load == INTERPOLATED_LOAD_TYPE.EM_FORCE:
+            self.num_components = 3
+        elif self.interpolated_load == INTERPOLATED_LOAD_TYPE.HEAT_FLUX:
+            self.num_components = 1
+        else:
+            raise ValueError(f"Unsupported load type: {self.interpolated_load}")
