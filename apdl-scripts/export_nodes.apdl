@@ -1,0 +1,58 @@
+!*******************************************************************************
+! Script: export_nodes
+! Description: Exports node coordinates from a named selection to a CSV file
+! 
+! Instructions: Edit the variables below before running the script
+!*******************************************************************************
+
+! ============================================================================
+! USER INPUTS - MODIFY THESE VARIABLES
+! ============================================================================
+cdb_file = 'CDB_name'                    ! CDB file name without extension
+named_selection = 'component_name'       ! Name of the component/named selection
+output_file = 'nodes_output'             ! Output CSV file name without extension
+! ============================================================================
+
+! Read CDB file
+CDREAD,DB,%cdb_file%,cdb
+
+! Select the named selection/component
+CMSEL,S,%named_selection%
+NSLE,S
+
+! Get node count and first node
+*GET,nN,NODE,0,COUNT	
+*GET,iN,NODE,,NUM,MIN
+
+! Allocate arrays
+*DIM, nCoords, ARRAY, nN, 3		! node coordinates
+*DIM, nNId, ARRAY, nN           ! node ids
+
+! Loop through selected nodes and store coordinates
+*DO,i,1,nN				        ! loop on selected nodes
+    nNId(i)    = iN		        ! node Id
+    nCoords(i,1) = NX(iN)	    ! X coordinate
+    nCoords(i,2) = NY(iN)	    ! Y coordinate
+    nCoords(i,3) = NZ(iN)	    ! Z coordinate
+    iN = NDNEXT(iN)
+*ENDDO
+
+! Write results to CSV file
+*CFOPEN,%output_file%,csv
+! Write header
+*VWRITE,'Node_ID','X','Y','Z'
+(A,',',A,',',A,',',A)
+! Write data
+*VWRITE,nNId(1),nCoords(1,1),nCoords(1,2),nCoords(1,3)
+(F10.0,',',E16.9,',',E16.9,',',E16.9)
+*CFCLOS
+
+! Clean up arrays
+*DIM, nCoords, DELETE
+*DIM, nNId, DELETE
+
+*MSG,INFO
+Read CDB file '%cdb_file%.cdb' and exported %nN% node coordinates from '%named_selection%' to %output_file%.csv
+
+! Restore full node selection
+ALLSEL,ALL

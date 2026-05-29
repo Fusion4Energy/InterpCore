@@ -28,16 +28,16 @@ from interpcore.kernels import INTERPOLATION_KERNEL
 
 # Configure interpolation
 config = InterpolationConfig(
-    method=QUERY_TYPE.K,
-    param=5,
-    max_distance=2.0,
-    coincidence_tolerance=0.01,
-    kernel=INTERPOLATION_KERNEL.DISTANCE_WEIGHTED,
-    multithread=False,
-    interpolated_load=INTERPOLATED_LOAD_TYPE.EM_FORCE
+    method=QUERY_TYPE.K,  # type of neighbour search
+    param=5,  # parameter relative to the neighbour search (K or radius)
+    max_distance=2.0, # filter by a max radius of search (in case of K is used)
+    coincidence_tolerance=0.01, # tolerance to consider two nodes coincident
+    kernel=INTERPOLATION_KERNEL.DISTANCE_WEIGHTED, # How to interpolate
+    multithread=False, # use or not multithread
+    interpolated_load=INTERPOLATED_LOAD_TYPE.EM_FORCE # type of load that is being interpolated
 )
 
-# Define file column indices
+# Define file column indices. This gives the column index in the input files
 file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
 
 # Create interpolator and run
@@ -54,7 +54,7 @@ interpolator.interpolate_all()
 # Export to ANSYS format
 interpolator.export_to_ansys("output_directory")
 
-# Optional: Build VTK for visualization
+# Optional: Build VTK for visualization. If outdir=None they are not exported
 interpolator.build_vtk_output(outdir="vtk_output")
 ```
 
@@ -102,37 +102,11 @@ A value is assigned to each destination point based on source neighbours
 
 ## File Format
 
-### Destination Mesh
-```
-Node_ID X Y Z
-101 0.25 0.33 0.00
-102 0.25 1.00 0.00
-...
-```
+The file format is pretty free, header, no header, commas, tabs....
+The important part is that the correct index columns are specified when creating the interpolator.
 
-### Source Data (EM Forces)
-```
-Node_ID X Y Z Fx Fy Fz
-1 0.50 0.50 0.00 10.50 5.20 2.10
-2 0.60 1.50 0.00 12.30 6.40 2.35
-...
-```
-
-### Source Data (Heat Flux)
-```
-Node_ID X Y Z HeatFlux
-1 0.50 0.50 0.00 100.00
-2 0.50 1.50 0.00 130.00
-...
-```
-
-### Source Data (Heat Generation)
-```
-Node_ID X Y Z HeatGen
-1 0.45 0.70 0.00 500.00
-2 0.45 1.50 0.00 550.00
-...
-```
+Destination mesh input files can be created using the apdl scripts included in this repository
+[here](/apdl-scripts/).
 
 ## Requirements
 
