@@ -1,11 +1,12 @@
-from interpcore.config import InterpolationConfig
+from interpcore.config import InterpolationConfig, INTERPOLATED_LOAD_TYPE
 from pathlib import Path
 from interpcore.parsers import parse_mech_mesh, parse_values
 from interpcore.dest_tree import DestinationTree
 import os
-import numpy as np
+import pyvista as pv
 import logging
-import pandas as pd
+
+from tqdm import tqdm
 
 
 class Interpolator:
@@ -44,9 +45,11 @@ class Interpolator:
 
         # raise an error if folder does not exist or is empty
         if not os.path.exists(path_to_src_folder):
-            raise FileNotFoundError(f"EM folder {path_to_src_folder} does not exist.")
+            raise FileNotFoundError(
+                f"Source folder {path_to_src_folder} does not exist."
+            )
         if len(os.listdir(path_to_src_folder)) == 0:
-            raise FileNotFoundError(f"EM folder {path_to_src_folder} is empty.")
+            raise FileNotFoundError(f"Source folder {path_to_src_folder} is empty.")
 
         for file in os.listdir(path_to_src_folder):
             file_path = Path(path_to_src_folder, file)
@@ -69,46 +72,37 @@ class Interpolator:
             config=config,
         )
         self.interpolated_results = None
-        self.dest_vtk = {}
-        self.src_vtk = {}
+        self.dest_vtk: dict[str, pv.PolyData] = {}
+        self.src_vtk: dict[str, pv.PolyData] = {}
 
-    def interpolate_all(self, progress_callback=None):
-        """Go through all em forces file and interpolate them
-        Parameters
-        ----------
-        progress_callback : callable, optional
-            Function to call with progress percentage (int 0-100)
-        """
+    def interpolate_all(self):
+        """Go through all em forces file and interpolate them"""
         interpolated_results = {}
-        total = len(self.src_values)
-        for idx, (name, values) in enumerate(self.src_values.items()):
+        for name, values in tqdm(self.src_values.items(), total=len(self.src_values)):
             interpolated, unmapped = self.tree.interpolate(values)
             interpolated_results[name] = {
                 "interpolated": interpolated,
                 "unmapped": unmapped,
             }
-            if progress_callback is not None:
-                percent = int(100 * (idx + 1) / total)
-                progress_callback(percent)
         self.interpolated_results = interpolated_results
 
-    def dump_interpolation_check(self, outfile: Path, pole: np.ndarray | None = None):
-        """Dump a csv file with the interpolation check results
-        Parameters
-        ----------
-        outfile : Path
-            output csv file path
-        pole : np.ndarray | None, optional
-            reference pole for moment calculation, by default None (0,0,0)
-        """
-        rows = []
-        for name in self.src_values.keys():
-            row = self._compute_resultants(name, pole)
-            rows.append(row)
+    # def dump_interpolation_check(self, outfile: Path, pole: np.ndarray | None = None):
+    #     """Dump a csv file with the interpolation check results
+    #     Parameters
+    #     ----------
+    #     outfile : Path
+    #         output csv file path
+    #     pole : np.ndarray | None, optional
+    #         reference pole for moment calculation, by default None (0,0,0)
+    #     """
+    #     rows = []
+    #     for name in self.src_values.keys():
+    #         row = self._compute_resultants(name, pole)
+    #         rows.append(row)
 
-        df = pd.DataFrame(rows)
-        df.to_csv(outfile, index=False)
-        logging.info(f"Interpolation check dumped to {outfile}")
+    #     df = pd.DataFrame(rows)
+    #     df.to_csv(outfile, index=False)
+    #     logging.info(f"Interpolation check dumped to {outfile}")
 
     def export_to_ansys(self, outdir: Path):
         """Export each interpolated result to an ANSYS format
@@ -117,82 +111,81 @@ class Interpolator:
         ----------
         outdir : Path
             output directory for the interpolated files
-
         """
         if self.interpolated_results is None:
             raise ValueError(
                 "No interpolated results found. Run interpolate_all() first."
             )
 
+        templates = _select_template(self.tree.config.interpolated_load)
+
         for name, result in self.interpolated_results.items():
             outfile = Path(outdir, f"interpolated_{name}.txt")
 
             with open(outfile, "w") as f:
-                for i, label in enumerate(["Fx", "Fy", "Fz"]):
-                    for j, nodeID in enumerate(self.node_numbers):
-                        f.write(
-                            f"F, {int(nodeID)}, {label}, {result['interpolated'][j][i]}\n"
-                        )
+                for i, template in enumerate(templates):
+                    for j, id in enumerate(self.tree.ids):
+                        f.write(template.format(id, result["interpolated"][j, i]))
 
         logging.info(f"ANSYS files exported to {outdir}")
 
-    def _compute_resultants(self, name: str, pole: np.ndarray | None = None) -> dict:
-        if pole is None:
-            pole = np.array([0.0, 0.0, 0.0])
+    # def _compute_resultants(self, name: str, pole: np.ndarray | None = None) -> dict:
+    #     if pole is None:
+    #         pole = np.array([0.0, 0.0, 0.0])
 
-        F_EM = self.src_values[name]
-        if self.interpolated_results is None:
-            raise ValueError(
-                "No interpolated results found. Run interpolate_all() first."
-            )
-        F_Mech = self.interpolated_results[name]["interpolated"]
+    #     F_EM = self.src_values[name]
+    #     if self.interpolated_results is None:
+    #         raise ValueError(
+    #             "No interpolated results found. Run interpolate_all() first."
+    #         )
+    #     F_Mech = self.interpolated_results[name]["interpolated"]
 
-        R_F_EM = np.sum(F_EM, axis=0)
-        R_F_Mech = np.sum(F_Mech, axis=0)
+    #     R_F_EM = np.sum(F_EM, axis=0)
+    #     R_F_Mech = np.sum(F_Mech, axis=0)
 
-        M_EM = np.cross(self.em_x - pole, F_EM)
-        M_Mech = np.cross(self.mech_x - pole, F_Mech)
+    #     M_EM = np.cross(self.em_x - pole, F_EM)
+    #     M_Mech = np.cross(self.mech_x - pole, F_Mech)
 
-        R_M_EM = np.sum(M_EM, axis=0)
-        R_M_Mech = np.sum(M_Mech, axis=0)
+    #     R_M_EM = np.sum(M_EM, axis=0)
+    #     R_M_Mech = np.sum(M_Mech, axis=0)
 
-        f_err_comp = np.divide(R_F_EM - R_F_Mech, R_F_EM)
-        m_err_comp = np.divide(R_M_EM - R_M_Mech, R_M_EM)
+    #     f_err_comp = np.divide(R_F_EM - R_F_Mech, R_F_EM)
+    #     m_err_comp = np.divide(R_M_EM - R_M_Mech, R_M_EM)
 
-        # give some warning if differences are very high
-        if np.any(np.abs(f_err_comp) > 0.2):
-            logging.warning(f"High difference in force resultant for {name}")
-        if np.any(np.abs(m_err_comp) > 0.2):
-            logging.warning(f"High difference in moment resultant for {name}")
+    #     # give some warning if differences are very high
+    #     if np.any(np.abs(f_err_comp) > 0.2):
+    #         logging.warning(f"High difference in force resultant for {name}")
+    #     if np.any(np.abs(m_err_comp) > 0.2):
+    #         logging.warning(f"High difference in moment resultant for {name}")
 
-        row = {
-            "Name": name,
-            "Fx [N]": R_F_EM[0],
-            "Fy [N]": R_F_EM[1],
-            "Fz [N]": R_F_EM[2],
-            "Mx [Nm]": R_M_EM[0],
-            "My [Nm]": R_M_EM[1],
-            "Mz [Nm]": R_M_EM[2],
-            "dFx [%]": f_err_comp[0] * 100,
-            "dFy [%]": f_err_comp[1] * 100,
-            "dFz [%]": f_err_comp[2] * 100,
-            "dMx [%]": m_err_comp[0] * 100,
-            "dMy [%]": m_err_comp[1] * 100,
-            "dMz [%]": m_err_comp[2] * 100,
-            "Unmapped_EM_Force [N]": np.linalg.norm(
-                self.interpolated_results[name]["unmapped"]
-            ),
-        }
+    #     row = {
+    #         "Name": name,
+    #         "Fx [N]": R_F_EM[0],
+    #         "Fy [N]": R_F_EM[1],
+    #         "Fz [N]": R_F_EM[2],
+    #         "Mx [Nm]": R_M_EM[0],
+    #         "My [Nm]": R_M_EM[1],
+    #         "Mz [Nm]": R_M_EM[2],
+    #         "dFx [%]": f_err_comp[0] * 100,
+    #         "dFy [%]": f_err_comp[1] * 100,
+    #         "dFz [%]": f_err_comp[2] * 100,
+    #         "dMx [%]": m_err_comp[0] * 100,
+    #         "dMy [%]": m_err_comp[1] * 100,
+    #         "dMz [%]": m_err_comp[2] * 100,
+    #         "Unmapped_EM_Force [N]": np.linalg.norm(
+    #             self.interpolated_results[name]["unmapped"]
+    #         ),
+    #     }
 
-        return row
+    #     return row
 
-    def build_vtk_output(self):
+    def build_vtk_output(self, outdir: Path | None = None):
         """Build the VTK output files for visualization
 
         Parameters
         ----------
-        outdir : Path
-            output directory for the interpolated files
+        oiutdir : Path | None, optional
+            output directory for the vtk files, if None, files are not saved, by default None
 
         """
         if self.interpolated_results is None:
@@ -201,49 +194,50 @@ class Interpolator:
             )
         # build and dump the vtks
         for name in self.src_values.keys():
-            # Mech
-            pdata = pv.PolyData(self.mech_x)
-            pdata["Fx [N]"] = self.interpolated_results[name]["interpolated"][:, 0]
-            pdata["Fy [N]"] = self.interpolated_results[name]["interpolated"][:, 1]
-            pdata["Fz [N]"] = self.interpolated_results[name]["interpolated"][:, 2]
-            pdata["Force [N]"] = self.interpolated_results[name]["interpolated"]
+            # Destination mesh
+            pdata = pv.PolyData(self.tree.dest_coordinates)
+            interp_matrix = self.interpolated_results[name]["interpolated"]
+
+            # For scalar data (1 component), flatten to 1D array for better performance
+            if interp_matrix.shape[1] == 1:
+                pdata["Value"] = interp_matrix.ravel()
+            else:
+                pdata["Value"] = interp_matrix
+                for i in range(interp_matrix.shape[1]):
+                    pdata[f"Component_{i}"] = interp_matrix[:, i]
             self.dest_vtk[name] = pdata
 
-            # EM
-            pdata_em = pv.PolyData(self.em_x)
-            pdata_em["Fx [N]"] = self.src_values[name][:, 0]
-            pdata_em["Fy [N]"] = self.src_values[name][:, 1]
-            pdata_em["Fz [N]"] = self.src_values[name][:, 2]
-            pdata_em["Force [N]"] = self.src_values[name]
+            # Source mesh
+            pdata_em = pv.PolyData(self.tree.src_coordinates)
+            interp_matrix_em = self.src_values[name]
+
+            # For scalar data (1 component), flatten to 1D array for better performance
+            if interp_matrix_em.shape[1] == 1:
+                pdata_em["Value"] = interp_matrix_em.ravel()
+            else:
+                pdata_em["Value"] = interp_matrix_em
+                for i in range(interp_matrix_em.shape[1]):
+                    pdata_em[f"Component_{i}"] = interp_matrix_em[:, i]
+
             self.src_vtk[name] = pdata_em
 
-    def export_forces_to_vtk(self, outdir: Path):
-        """Export each interpolated result to a different VTK
+            if outdir is not None:
+                outfile = Path(outdir, f"{name}_interpolated.vtk")
+                self.dest_vtk[name].save(outfile)
+                outfile_em = Path(outdir, f"{name}_EM.vtk")
+                self.src_vtk[name].save(outfile_em)
 
-        Parameters
-        ----------
-        outdir : Path
-            output directory for the interpolated files
 
-        """
-        if self.interpolated_results is None:
-            raise ValueError(
-                "No interpolated results found. Run interpolate_all() first."
-            )
-
-        # dump the vtks
-        # check first if vtk where built
-        if not self.dest_vtk or not self.src_vtk:
-            logging.warning("vtk were not built, building now...")
-            self.build_vtk_output()
-
-        for name in self.src_values.keys():
-            # Mech
-            outfile = Path(outdir, f"{name}_interpolated.vtk")
-            self.dest_vtk[name].save(outfile)
-
-            # EM
-            outfile_em = Path(outdir, f"{name}_EM.vtk")
-            self.src_vtk[name].save(outfile_em)
-
-        logging.info(f"VTK files exported to {outdir}")
+def _select_template(interpolated_load: INTERPOLATED_LOAD_TYPE) -> list[str]:
+    if interpolated_load == INTERPOLATED_LOAD_TYPE.EM_FORCE:
+        return [
+            "F, {}, Fx, {}\n",
+            "F, {}, Fy, {}\n",
+            "F, {}, Fz, {}\n",
+        ]
+    elif interpolated_load == INTERPOLATED_LOAD_TYPE.HEAT_FLUX:
+        return [
+            "SFE, {},, HFLUX, {}\n",
+        ]
+    else:
+        raise NotImplementedError(f"Unsupported load type: {interpolated_load}")

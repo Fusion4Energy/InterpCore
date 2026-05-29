@@ -1,0 +1,429 @@
+import pytest
+import tempfile
+import shutil
+from pathlib import Path
+from interpcore.interpolator import Interpolator, _select_template
+from interpcore.config import (
+    InterpolationConfig,
+    QUERY_TYPE,
+    INTERPOLATED_LOAD_TYPE,
+    INTERPOLATION_KERNEL,
+)
+
+
+@pytest.fixture
+def temp_dir():
+    """Create a temporary directory for testing"""
+    temp = tempfile.mkdtemp()
+    yield Path(temp)
+    shutil.rmtree(temp)
+
+
+@pytest.fixture
+def sample_config_heat_flux():
+    """Create a sample configuration for heat flux interpolation"""
+    return InterpolationConfig(
+        method=QUERY_TYPE.RADIUS,
+        param=1.0,
+        max_distance=2.0,
+        coincidence_tolerance=1e-6,
+        kernel=INTERPOLATION_KERNEL.DISTANCE_WEIGHTED,
+        multithread=False,
+        interpolated_load=INTERPOLATED_LOAD_TYPE.HEAT_FLUX,
+    )
+
+
+@pytest.fixture
+def sample_config_em_force():
+    """Create a sample configuration for EM force interpolation"""
+    return InterpolationConfig(
+        method=QUERY_TYPE.K,
+        param=2,
+        max_distance=2.0,
+        coincidence_tolerance=1e-6,
+        kernel=INTERPOLATION_KERNEL.AVERAGE,
+        multithread=False,
+        interpolated_load=INTERPOLATED_LOAD_TYPE.EM_FORCE,
+    )
+
+
+@pytest.fixture
+def create_sample_mesh_files(temp_dir):
+    """Create sample mesh and data files for testing"""
+    # Create destination mesh file
+    dest_mesh = temp_dir / "destination_mesh.txt"
+    dest_content = """Node_ID X Y Z
+101 0.0 0.0 0.0
+102 1.0 0.0 0.0
+103 2.0 0.0 0.0
+104 0.0 1.0 0.0
+105 1.0 1.0 0.0
+"""
+    dest_mesh.write_text(dest_content)
+
+    # Create source data folder
+    src_folder = temp_dir / "source_data"
+    src_folder.mkdir()
+
+    # Create source data file with heat flux (1 component)
+    src_file = src_folder / "data_001.txt"
+    src_content = """Node_ID X Y Z HeatFlux
+1 0.5 0.5 0.0 100.0
+2 1.5 0.5 0.0 200.0
+3 0.5 1.5 0.0 150.0
+"""
+    src_file.write_text(src_content)
+
+    return {
+        "dest_mesh": str(dest_mesh),
+        "src_folder": str(src_folder),
+    }
+
+
+@pytest.fixture
+def create_sample_em_force_files(temp_dir):
+    """Create sample mesh and EM force data files for testing"""
+    # Create destination mesh file
+    dest_mesh = temp_dir / "destination_mesh.txt"
+    dest_content = """Node_ID X Y Z
+201 0.0 0.0 0.0
+202 1.0 0.0 0.0
+203 2.0 0.0 0.0
+"""
+    dest_mesh.write_text(dest_content)
+
+    # Create source data folder
+    src_folder = temp_dir / "em_force_data"
+    src_folder.mkdir()
+
+    # Create source data file with EM forces (3 components)
+    src_file = src_folder / "force_001.txt"
+    src_content = """Node_ID X Y Z Fx Fy Fz
+1 0.5 0.0 0.0 10.0 20.0 30.0
+2 1.5 0.0 0.0 15.0 25.0 35.0
+"""
+    src_file.write_text(src_content)
+
+    return {
+        "dest_mesh": str(dest_mesh),
+        "src_folder": str(src_folder),
+    }
+
+
+class TestInterpolator:
+    """Tests for Interpolator class"""
+
+    def test_initialization_with_valid_inputs(
+        self, create_sample_mesh_files, sample_config_heat_flux
+    ):
+        """Test successful initialization with valid mesh and data files"""
+        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        interpolator = Interpolator(
+            path_to_src_folder=create_sample_mesh_files["src_folder"],
+            path_to_dest_mesh=create_sample_mesh_files["dest_mesh"],
+            config=sample_config_heat_flux,
+            file_idx=file_idx,
+        )
+
+        assert interpolator is not None
+        assert interpolator.tree is not None
+        assert len(interpolator.src_values) == 1
+        assert "data_001" in interpolator.src_values
+        assert interpolator.interpolated_results is None
+
+    def test_initialization_with_custom_file_idx(
+        self, create_sample_mesh_files, sample_config_heat_flux
+    ):
+        """Test initialization with custom file indices"""
+        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        interpolator = Interpolator(
+            path_to_src_folder=create_sample_mesh_files["src_folder"],
+            path_to_dest_mesh=create_sample_mesh_files["dest_mesh"],
+            config=sample_config_heat_flux,
+            file_idx=file_idx,
+        )
+
+        assert interpolator is not None
+        assert interpolator.tree is not None
+
+    def test_initialization_with_missing_source_folder(
+        self, temp_dir, sample_config_heat_flux
+    ):
+        """Test that FileNotFoundError is raised when source folder doesn't exist"""
+        dest_mesh = temp_dir / "dest.txt"
+        dest_mesh.write_text("Node_ID X Y Z\n1 0.0 0.0 0.0\n")
+        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+
+        with pytest.raises(FileNotFoundError, match="does not exist"):
+            Interpolator(
+                path_to_src_folder=str(temp_dir / "nonexistent"),
+                path_to_dest_mesh=str(dest_mesh),
+                config=sample_config_heat_flux,
+                file_idx=file_idx,
+            )
+
+    def test_initialization_with_empty_source_folder(
+        self, temp_dir, sample_config_heat_flux
+    ):
+        """Test that FileNotFoundError is raised when source folder is empty"""
+        dest_mesh = temp_dir / "dest.txt"
+        dest_mesh.write_text("Node_ID X Y Z\n1 0.0 0.0 0.0\n")
+        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+
+        empty_folder = temp_dir / "empty"
+        empty_folder.mkdir()
+
+        with pytest.raises(FileNotFoundError, match="is empty"):
+            Interpolator(
+                path_to_src_folder=str(empty_folder),
+                path_to_dest_mesh=str(dest_mesh),
+                config=sample_config_heat_flux,
+                file_idx=file_idx,
+            )
+
+    def test_interpolate_all(self, create_sample_mesh_files, sample_config_heat_flux):
+        """Test the interpolate_all method"""
+        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        interpolator = Interpolator(
+            path_to_src_folder=create_sample_mesh_files["src_folder"],
+            path_to_dest_mesh=create_sample_mesh_files["dest_mesh"],
+            config=sample_config_heat_flux,
+            file_idx=file_idx,
+        )
+
+        interpolator.interpolate_all()
+
+        assert interpolator.interpolated_results is not None
+        assert len(interpolator.interpolated_results) == 1
+        assert "data_001" in interpolator.interpolated_results
+
+        result = interpolator.interpolated_results["data_001"]
+        assert "interpolated" in result
+        assert "unmapped" in result
+        assert result["interpolated"].shape[0] > 0  # Has destination points
+        assert result["interpolated"].shape[1] == 1  # Heat flux is 1 component
+
+    def test_interpolate_all_with_em_force(
+        self, create_sample_em_force_files, sample_config_em_force
+    ):
+        """Test interpolation with EM force data (3 components)"""
+        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        interpolator = Interpolator(
+            path_to_src_folder=create_sample_em_force_files["src_folder"],
+            path_to_dest_mesh=create_sample_em_force_files["dest_mesh"],
+            config=sample_config_em_force,
+            file_idx=file_idx,
+        )
+
+        interpolator.interpolate_all()
+
+        assert interpolator.interpolated_results is not None
+        result = interpolator.interpolated_results["force_001"]
+        assert result["interpolated"].shape[1] == 3  # EM force has 3 components
+
+    def test_export_to_ansys_without_interpolation(
+        self, create_sample_mesh_files, sample_config_heat_flux, temp_dir
+    ):
+        """Test that export raises ValueError when called before interpolation"""
+        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        interpolator = Interpolator(
+            path_to_src_folder=create_sample_mesh_files["src_folder"],
+            path_to_dest_mesh=create_sample_mesh_files["dest_mesh"],
+            config=sample_config_heat_flux,
+            file_idx=file_idx,
+        )
+
+        output_dir = temp_dir / "output"
+        output_dir.mkdir()
+
+        with pytest.raises(
+            ValueError, match="No interpolated results found. Run interpolate_all"
+        ):
+            interpolator.export_to_ansys(output_dir)
+
+    def test_export_to_ansys_heat_flux(
+        self, create_sample_mesh_files, sample_config_heat_flux, temp_dir
+    ):
+        """Test exporting heat flux results to ANSYS format"""
+        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        interpolator = Interpolator(
+            path_to_src_folder=create_sample_mesh_files["src_folder"],
+            path_to_dest_mesh=create_sample_mesh_files["dest_mesh"],
+            config=sample_config_heat_flux,
+            file_idx=file_idx,
+        )
+
+        interpolator.interpolate_all()
+
+        output_dir = temp_dir / "output"
+        output_dir.mkdir()
+        interpolator.export_to_ansys(output_dir)
+
+        # Check that output file was created
+        output_files = list(output_dir.glob("interpolated_*.txt"))
+        assert len(output_files) == 1
+        assert output_files[0].name == "interpolated_data_001.txt"
+
+        # Check file content format
+        content = output_files[0].read_text()
+        assert "SFE" in content
+        assert "HFLUX" in content
+
+    def test_export_to_ansys_em_force(
+        self, create_sample_em_force_files, sample_config_em_force, temp_dir
+    ):
+        """Test exporting EM force results to ANSYS format"""
+        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        interpolator = Interpolator(
+            path_to_src_folder=create_sample_em_force_files["src_folder"],
+            path_to_dest_mesh=create_sample_em_force_files["dest_mesh"],
+            config=sample_config_em_force,
+            file_idx=file_idx,
+        )
+
+        interpolator.interpolate_all()
+
+        output_dir = temp_dir / "output"
+        output_dir.mkdir()
+        interpolator.export_to_ansys(output_dir)
+
+        # Check that output file was created
+        output_files = list(output_dir.glob("interpolated_*.txt"))
+        assert len(output_files) == 1
+
+        # Check file content format (should have Fx, Fy, Fz)
+        content = output_files[0].read_text()
+        assert "Fx" in content
+        assert "Fy" in content
+        assert "Fz" in content
+
+    def test_build_vtk_output_without_interpolation(
+        self, create_sample_mesh_files, sample_config_heat_flux
+    ):
+        """Test that build_vtk_output raises ValueError when called before interpolation"""
+        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        interpolator = Interpolator(
+            path_to_src_folder=create_sample_mesh_files["src_folder"],
+            path_to_dest_mesh=create_sample_mesh_files["dest_mesh"],
+            config=sample_config_heat_flux,
+            file_idx=file_idx,
+        )
+
+        with pytest.raises(
+            ValueError, match="No interpolated results found. Run interpolate_all"
+        ):
+            interpolator.build_vtk_output()
+
+    def test_build_vtk_output_without_saving(
+        self, create_sample_mesh_files, sample_config_heat_flux
+    ):
+        """Test building VTK output without saving to disk"""
+        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        interpolator = Interpolator(
+            path_to_src_folder=create_sample_mesh_files["src_folder"],
+            path_to_dest_mesh=create_sample_mesh_files["dest_mesh"],
+            config=sample_config_heat_flux,
+            file_idx=file_idx,
+        )
+
+        interpolator.interpolate_all()
+        interpolator.build_vtk_output(outdir=None)
+
+        # Check that VTK dictionaries are populated
+        assert len(interpolator.dest_vtk) == 1
+        assert len(interpolator.src_vtk) == 1
+        assert "data_001" in interpolator.dest_vtk
+        assert "data_001" in interpolator.src_vtk
+
+    def test_build_vtk_output_with_saving(
+        self, create_sample_mesh_files, sample_config_heat_flux, temp_dir
+    ):
+        """Test building and saving VTK output to disk"""
+        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        interpolator = Interpolator(
+            path_to_src_folder=create_sample_mesh_files["src_folder"],
+            path_to_dest_mesh=create_sample_mesh_files["dest_mesh"],
+            config=sample_config_heat_flux,
+            file_idx=file_idx,
+        )
+
+        interpolator.interpolate_all()
+
+        output_dir = temp_dir / "vtk_output"
+        output_dir.mkdir()
+        interpolator.build_vtk_output(outdir=output_dir)
+
+        # Check that VTK files were created
+        vtk_files = list(output_dir.glob("*.vtk"))
+        assert len(vtk_files) == 2  # One for source, one for destination
+
+        # Check file names
+        file_names = [f.name for f in vtk_files]
+        assert "data_001_interpolated.vtk" in file_names
+        assert "data_001_EM.vtk" in file_names
+
+    def test_multiple_source_files(self, temp_dir, sample_config_heat_flux):
+        """Test interpolation with multiple source data files"""
+        # Create destination mesh
+        dest_mesh = temp_dir / "dest.txt"
+        dest_content = """Node_ID X Y Z
+1 0.0 0.0 0.0
+2 1.0 0.0 0.0
+"""
+        dest_mesh.write_text(dest_content)
+
+        # Create source folder with multiple files
+        src_folder = temp_dir / "sources"
+        src_folder.mkdir()
+
+        for i in range(3):
+            src_file = src_folder / f"data_{i:03d}.txt"
+            src_content = f"""Node_ID X Y Z HeatFlux
+1 0.5 0.0 0.0 {100 + i * 10}.0
+"""
+            src_file.write_text(src_content)
+
+        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        interpolator = Interpolator(
+            path_to_src_folder=str(src_folder),
+            path_to_dest_mesh=str(dest_mesh),
+            config=sample_config_heat_flux,
+            file_idx=file_idx,
+        )
+
+        assert len(interpolator.src_values) == 3
+
+        interpolator.interpolate_all()
+        assert interpolator.interpolated_results is not None
+        assert len(interpolator.interpolated_results) == 3
+
+
+class TestSelectTemplate:
+    """Tests for _select_template helper function"""
+
+    def test_select_template_em_force(self):
+        """Test template selection for EM force"""
+        templates = _select_template(INTERPOLATED_LOAD_TYPE.EM_FORCE)
+
+        assert len(templates) == 3
+        assert "Fx" in templates[0]
+        assert "Fy" in templates[1]
+        assert "Fz" in templates[2]
+
+    def test_select_template_heat_flux(self):
+        """Test template selection for heat flux"""
+        templates = _select_template(INTERPOLATED_LOAD_TYPE.HEAT_FLUX)
+
+        assert len(templates) == 1
+        assert "HFLUX" in templates[0]
+        assert "SFE" in templates[0]
+
+    def test_select_template_unsupported_type(self):
+        """Test that unsupported load types raise NotImplementedError"""
+
+        # Create a mock unsupported load type
+        class UnsupportedLoad:
+            pass
+
+        with pytest.raises(NotImplementedError):
+            _select_template(UnsupportedLoad())

@@ -20,6 +20,8 @@ classifiers = [
 dependencies = [
     "scikit-learn",
     "pandas",
+    "tqdm",
+    "pyvista"
     # "PyQt5",
     # "pyvistaqt",
 ]
