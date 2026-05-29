@@ -237,11 +237,11 @@ def _select_template(interpolated_load: INTERPOLATED_LOAD_TYPE) -> list[str]:
         ]
     elif interpolated_load == INTERPOLATED_LOAD_TYPE.HEAT_FLUX:
         return [
-            "SFE, {},, HFLUX, {}\n",
+            "SFE, {},, HFLUX,, {}\n",
         ]
     elif interpolated_load == INTERPOLATED_LOAD_TYPE.HEAT_GEN:
         return [
-            "BFE, {},, HGEN, {}\n",
+            "BFE, {}, HGEN,, {}\n",
         ]
     else:
         raise NotImplementedError(f"Unsupported load type: {interpolated_load}")
