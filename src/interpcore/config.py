@@ -51,6 +51,10 @@ class InterpolationConfig:
         Whether to use multithreading for interpolation.
     interpolated_load: INTERPOLATED_LOAD_TYPE
         Type of load to interpolate.
+    accept_no_neighbor : bool, optional
+        Whether to accept points with no neighbors within max_distance.
+        If False, an error will be raised. If true, interpolated value will
+        be set to zero for these points. By default False.
 
     Raises
     ------
@@ -65,6 +69,7 @@ class InterpolationConfig:
     kernel: INTERPOLATION_KERNEL
     multithread: bool
     interpolated_load: INTERPOLATED_LOAD_TYPE
+    accept_no_neighbor: bool = False
 
     def __post_init__(self):
         if self.method == QUERY_TYPE.K:

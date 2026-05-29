@@ -223,6 +223,42 @@ class TestKernels:
                 config=config,
             )
 
+    def test_interpolate_block_accept_no_neighbor(self):
+        """Test that interpolate_block sets value to zero when accept_no_neighbor is True and destination has no neighbors"""
+        # Destination point far from all sources (dest-to-source mode)
+        src_coords = np.array([[0.0, 0.0, 0.0]])
+        dest_coords = np.array([[100.0, 100.0, 100.0], [0.5, 0.0, 0.0]])
+        src_values = np.array([[10.0, 20.0, 30.0]])
+
+        idx_query = np.array([np.array([0]), np.array([0])], dtype=object)
+
+        config = InterpolationConfig(
+            kernel=INTERPOLATION_KERNEL.AVERAGE,  # Dest-to-source mode
+            max_distance=5.0,  # Too small for first dest, ok for second
+            coincidence_tolerance=0.01,
+            method=QUERY_TYPE.K,
+            param=1,
+            multithread=False,
+            interpolated_load=INTERPOLATED_LOAD_TYPE.EM_FORCE,
+            accept_no_neighbor=True,  # Accept destinations with no neighbors
+        )
+
+        interpolated, unmapped = interpolate_block(
+            chunked_coords=dest_coords,
+            neighbours_coords=src_coords,
+            idx_query=idx_query,
+            chunk_idx=slice(0, 2),
+            src_values=src_values,
+            config=config,
+        )
+
+        # First destination (too far) should have zero values
+        np.testing.assert_array_equal(interpolated[0], [0.0, 0.0, 0.0])
+        # Second destination (close enough) should have interpolated values
+        assert np.any(interpolated[1] > 0)
+        # Nothing should be unmapped in dest-to-source mode
+        assert np.all(unmapped == 0)
+
     def test_interpolate_block_coincident_node(self):
         """Test that coincident nodes are handled correctly in source-to-dest mode"""
         # Source point almost exactly coincides with a destination point

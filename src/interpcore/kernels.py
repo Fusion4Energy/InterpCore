@@ -178,9 +178,13 @@ def interpolate_block(
                     unmapped = unmapped + src_values[i, :]
                 else:
                     # Destination point has no source neighbors - this is an error condition
-                    raise InterpolationError(
-                        f"Destination point at {point} has no source neighbors within max_distance"
-                    )
+                    if config.accept_no_neighbor:
+                        dest_idx = i - chunk_idx.start
+                        interpolated[dest_idx, :] = 0
+                    else:
+                        raise InterpolationError(
+                            f"Destination point at {point} has no source neighbors within max_distance"
+                        )
                 i = i + 1
                 continue
 
@@ -251,9 +255,13 @@ def interpolate_block(
             if is_src_to_dest:
                 unmapped = unmapped + src_values[i, :]
             else:
-                raise InterpolationError(
-                    f"Destination point at {point} has no neighbors"
-                )
+                if config.accept_no_neighbor:
+                    dest_idx = i - chunk_idx.start
+                    interpolated[dest_idx, :] = 0
+                else:
+                    raise InterpolationError(
+                        f"Destination point at {point} has no neighbors"
+                    )
 
         i += 1
 
