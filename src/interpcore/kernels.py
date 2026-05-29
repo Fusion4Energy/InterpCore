@@ -1,17 +1,8 @@
 import numpy as np
-from interpcore.config import InterpolationConfig
+from interpcore.config import InterpolationConfig, INTERPOLATION_KERNEL
 from sklearn.metrics.pairwise import euclidean_distances
 import logging
-from enum import Enum
-
-
-class INTERPOLATION_KERNEL(Enum):
-    """Kernels for interpolation, aka, how to distribute EM force on mech nodes."""
-
-    DISTANCE_WEIGHTED = "Weighted by distance"
-    FEM = "FEM system"
-    AVERAGE = "Average"
-    CLOSEST = "Closest"
+from interpcore.errors import InterpolationError
 
 
 # If true, the method tends to distribute each source point to the destination mesh
@@ -107,16 +98,29 @@ def _dist_weight_kernel(
     return True
 
 
-def _closest_node_kernel(
-    distances: np.ndarray,
-    dest_idx: np.ndarray,
-    src_index: int,
+def _average_kernel(
+    neighbours_idx: np.ndarray,
+    dest_index: int,
     vector_to_interp: np.ndarray,
     vector_interpolated: np.ndarray,
 ) -> bool:
-    """Assign the closest src value to each dest node"""
-    closest_idx = dest_idx[np.argmin(distances)]
-    vector_interpolated[closest_idx, :] += vector_to_interp[src_index]
+    """Average the values from neighboring source points (dest-to-source mode)"""
+    # Average all neighboring source values
+    avg_value = np.mean(vector_to_interp[neighbours_idx, :], axis=0)
+    vector_interpolated[dest_index, :] = avg_value
+    return True
+
+
+def _closest_source_kernel(
+    distances: np.ndarray,
+    neighbours_idx: np.ndarray,
+    dest_index: int,
+    vector_to_interp: np.ndarray,
+    vector_interpolated: np.ndarray,
+) -> bool:
+    """Assign value from the closest source point (dest-to-source mode)"""
+    closest_src_idx = neighbours_idx[np.argmin(distances)]
+    vector_interpolated[dest_index, :] = vector_to_interp[closest_src_idx, :]
     return True
 
 
@@ -128,13 +132,33 @@ def interpolate_block(
     src_values: np.ndarray,
     config: InterpolationConfig,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Interpolate a block of EM nodes to Mech nodes"""
-    interpolated = np.zeros([neighbours_coords.shape[0], 3])
-    unmapped = np.zeros([1, 3])
+    """Interpolate a block of points
+
+    This function handles two different philosophies:
+    1. Source-to-Destination (DEST_SRC_MAP[kernel] = True):
+       - chunked_coords are source points, neighbours_coords are destination points
+       - For each source point, distribute its value to neighboring destination points
+       - Used by: DISTANCE_WEIGHTED, FEM
+
+    2. Destination-to-Source (DEST_SRC_MAP[kernel] = False):
+       - chunked_coords are destination points, neighbours_coords are source points
+       - For each destination point, compute value from neighboring source points
+       - Used by: AVERAGE, CLOSEST
+    """
+    is_src_to_dest = DEST_SRC_MAP[config.kernel]
+
+    if is_src_to_dest:
+        # Initialize output for destination points
+        interpolated = np.zeros([neighbours_coords.shape[0], config.num_components])
+    else:
+        # Initialize output for destination points (same size as chunked_coords)
+        interpolated = np.zeros([chunked_coords.shape[0], config.num_components])
+
+    unmapped = np.zeros([1, config.num_components])
 
     i = chunk_idx.start
     for point in chunked_coords[chunk_idx]:
-        neighbours_idx = idx_query[i]
+        neighbours_idx = np.asarray(idx_query[i], dtype=int)
         mapped = False
 
         # Ensure query is not empty
@@ -142,36 +166,46 @@ def interpolate_block(
             distances = euclidean_distances(
                 neighbours_coords[neighbours_idx], point.reshape(1, -1)
             )
-            # clip the mech nodes based on max distance
+            # clip the nodes based on max distance
             keep = distances.flatten() < config.max_distance
             distances = distances[keep]
             neighbours_idx = neighbours_idx[keep]
 
             # Ensure that after clipping something remains
             if neighbours_idx.shape[0] == 0:
-                # TODO: this makes sense only when source are distributed and
-                # not viceversa. If kernel does not find neighbours of a destination
-                # point we should raise an error instead.
-                unmapped = unmapped + src_values[i, :]
+                if is_src_to_dest:
+                    # Source point has no destination neighbors - accumulate as unmapped
+                    unmapped = unmapped + src_values[i, :]
+                else:
+                    # Destination point has no source neighbors - this is an error condition
+                    raise InterpolationError(
+                        f"Destination point at {point} has no source neighbors within max_distance"
+                    )
                 i = i + 1
                 continue
 
             # if coincident node found, assign directly
             if distances[0] < config.coincidence_tolerance:
-                # TODO: also here be careful. neighbours idx may be src or dest
-                # depending on the kernel.
-                logging.debug(f"Coincident node found {chunked_coords[i, :]}")
-                interpolated[neighbours_idx[0], :] = [
-                    src_values[i, 0],
-                    src_values[i, 1],
-                    src_values[i, 2],
-                ]
+                logging.debug(f"Coincident node found {point}")
+                if is_src_to_dest:
+                    # Source point coincides with destination point
+                    # neighbours_idx[0] is the destination index
+                    interpolated[neighbours_idx[0], :] = src_values[i, :]
+                else:
+                    # Destination point coincides with source point
+                    # neighbours_idx[0] is the source index, i is relative to chunk
+                    dest_idx = i - chunk_idx.start
+                    interpolated[dest_idx, :] = src_values[neighbours_idx[0], :]
                 i = i + 1
                 continue
 
-            # TODO: logic is not always summing, to be double checked.
-            # If nothing above, perform the interpolation
-            # This will adjourn the "interpolated" array
+            # Perform the interpolation based on kernel and philosophy
+            if is_src_to_dest:
+                index = i
+            else:
+                index = i - chunk_idx.start
+
+            # Source-to-Destination: distribute source value to destination neighbors
             if config.kernel == INTERPOLATION_KERNEL.DISTANCE_WEIGHTED:
                 mapped = _dist_weight_kernel(
                     distances,
@@ -190,9 +224,37 @@ def interpolate_block(
                     src_values,
                     interpolated,
                 )
+
+            # Destination-to-Source: compute destination value from source neighbors
+            if config.kernel == INTERPOLATION_KERNEL.AVERAGE:
+                mapped = _average_kernel(
+                    neighbours_idx,
+                    index,
+                    src_values,
+                    interpolated,
+                )
+            elif config.kernel == INTERPOLATION_KERNEL.CLOSEST:
+                mapped = _closest_source_kernel(
+                    distances,
+                    neighbours_idx,
+                    index,
+                    src_values,
+                    interpolated,
+                )
+
+            if not mapped:
+                # Should be possible only in source-to-destination
+                unmapped = unmapped + src_values[i, :]
+
+        else:
+            # No neighbors found at all
+            if is_src_to_dest:
+                unmapped = unmapped + src_values[i, :]
             else:
-                raise ValueError(f"Unknown interpolation kernel {config.kernel}")
-        if not mapped:
-            unmapped = unmapped + src_values[i, :]
+                raise InterpolationError(
+                    f"Destination point at {point} has no neighbors"
+                )
+
         i += 1
+
     return interpolated, unmapped

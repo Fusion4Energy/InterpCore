@@ -1,6 +1,9 @@
 from dataclasses import dataclass
 from enum import Enum
-from interpcore.kernels import INTERPOLATION_KERNEL
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from interpcore.kernels import INTERPOLATION_KERNEL
 
 
 class QUERY_TYPE(Enum):
@@ -15,6 +18,15 @@ class INTERPOLATED_LOAD_TYPE(Enum):
 
     EM_FORCE = "EM-Force"
     HEAT_FLUX = "Heat Flux"
+
+
+class INTERPOLATION_KERNEL(Enum):
+    """Kernels for interpolation, aka, how to distribute EM force on mech nodes."""
+
+    DISTANCE_WEIGHTED = "Weighted by distance"
+    FEM = "FEM system"
+    AVERAGE = "Average"
+    CLOSEST = "Closest"
 
 
 @dataclass

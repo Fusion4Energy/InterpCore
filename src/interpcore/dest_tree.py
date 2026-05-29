@@ -108,7 +108,7 @@ class DestinationTree:
     def interpolate(
         self, vector_to_interpolate: np.ndarray
     ) -> tuple[np.ndarray, np.ndarray]:
-        """Perform the interpolation from EM to Mech nodes
+        """Perform the interpolation from source to destination nodes
 
         Parameters
         ----------
@@ -123,24 +123,30 @@ class DestinationTree:
         logging.info("Performing interpolation...")
         tic = time.perf_counter()
 
-        if self.dest_tree is None:
-            coords = self.dest_coordinates
+        # Determine which coordinates to loop over based on interpolation philosophy
+        is_src_to_dest = DEST_SRC_MAP[self.config.kernel]
+
+        if is_src_to_dest:
+            # Source-to-Destination: loop over source points
+            chunked_coords = self.src_coordinates
+            neighbours_coords = self.dest_coordinates
         else:
-            coords = self.src_coordinates
+            # Destination-to-Source: loop over destination points
+            chunked_coords = self.dest_coordinates
+            neighbours_coords = self.src_coordinates
 
         if self.config.multithread:
             num_threads = os.cpu_count() or 1
-            blocks = _get_blocks(coords, num_threads)
+            blocks = _get_blocks(chunked_coords, num_threads)
 
-            results = []
             with concurrent.futures.ThreadPoolExecutor(
                 max_workers=num_threads
             ) as executor:
                 futures = [
                     executor.submit(
                         interpolate_block,
-                        self.src_coordinates,
-                        self.dest_coordinates,
+                        chunked_coords,
+                        neighbours_coords,
                         self.idx_query,
                         block,
                         vector_to_interpolate,
@@ -148,22 +154,36 @@ class DestinationTree:
                     )
                     for block in blocks
                 ]
-                for future in concurrent.futures.as_completed(futures):
-                    results.append(future.result())
+                # Wait for all futures to complete and collect results in order
+                results = [future.result() for future in futures]
 
             interpolated = np.zeros(
                 [self.dest_coordinates.shape[0], self.config.num_components]
             )
             unmapped = np.zeros([1, self.config.num_components])
-            for interp, unm in results:
-                interpolated += interp
-                unmapped += unm
+
+            if is_src_to_dest:
+                # Source-to-Destination: accumulate contributions from multiple sources
+                for interp, unm in results:
+                    interpolated += interp
+                    unmapped += unm
+            else:
+                # Destination-to-Source: each destination gets computed once
+                # Combine partial results from different blocks in order
+                offset = 0
+                for interp, unm in results:
+                    block_size = interp.shape[0]
+                    interpolated[offset : offset + block_size, :] = interp
+                    unmapped += (
+                        unm  # unmapped should be minimal/zero for dest-to-source
+                    )
+                    offset += block_size
         else:
             interpolated, unmapped = interpolate_block(
-                self.src_coordinates,
-                self.dest_coordinates,
+                chunked_coords,
+                neighbours_coords,
                 self.idx_query,
-                slice(0, coords.shape[0]),
+                slice(0, chunked_coords.shape[0]),
                 vector_to_interpolate,
                 self.config,
             )
@@ -175,12 +195,13 @@ class DestinationTree:
         return interpolated, unmapped
 
 
-def _get_blocks(src_coord: np.ndarray, num_threads: int):
-    block_size = int(np.ceil(src_coord.shape[0] / num_threads))
+def _get_blocks(coords: np.ndarray, num_threads: int):
+    """Split coordinates into blocks for multithreading"""
+    block_size = int(np.ceil(coords.shape[0] / num_threads))
     blocks = [
         slice(
             i * block_size,
-            min((i + 1) * block_size, src_coord.shape[0]),
+            min((i + 1) * block_size, coords.shape[0]),
         )
         for i in range(num_threads)
     ]
