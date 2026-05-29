@@ -48,6 +48,20 @@ def sample_config_em_force():
 
 
 @pytest.fixture
+def sample_config_heat_gen():
+    """Create a sample configuration for heat generation interpolation"""
+    return InterpolationConfig(
+        method=QUERY_TYPE.K,
+        param=3,
+        max_distance=2.0,
+        coincidence_tolerance=1e-6,
+        kernel=INTERPOLATION_KERNEL.CLOSEST,
+        multithread=False,
+        interpolated_load=INTERPOLATED_LOAD_TYPE.HEAT_GEN,
+    )
+
+
+@pytest.fixture
 def create_sample_mesh_files(temp_dir):
     """Create sample mesh and data files for testing"""
     # Create destination mesh file
@@ -101,6 +115,38 @@ def create_sample_em_force_files(temp_dir):
     src_content = """Node_ID X Y Z Fx Fy Fz
 1 0.5 0.0 0.0 10.0 20.0 30.0
 2 1.5 0.0 0.0 15.0 25.0 35.0
+"""
+    src_file.write_text(src_content)
+
+    return {
+        "dest_mesh": str(dest_mesh),
+        "src_folder": str(src_folder),
+    }
+
+
+@pytest.fixture
+def create_sample_heat_gen_files(temp_dir):
+    """Create sample mesh and heat generation data files for testing"""
+    # Create destination mesh file
+    dest_mesh = temp_dir / "destination_mesh.txt"
+    dest_content = """Node_ID X Y Z
+301 0.0 0.0 0.0
+302 1.0 0.0 0.0
+303 2.0 0.0 0.0
+304 0.0 1.0 0.0
+"""
+    dest_mesh.write_text(dest_content)
+
+    # Create source data folder
+    src_folder = temp_dir / "heat_gen_data"
+    src_folder.mkdir()
+
+    # Create source data file with heat generation (1 component)
+    src_file = src_folder / "heatgen_001.txt"
+    src_content = """Node_ID X Y Z HeatGen
+1 0.5 0.5 0.0 500.0
+2 1.5 0.5 0.0 750.0
+3 0.5 1.5 0.0 600.0
 """
     src_file.write_text(src_content)
 
@@ -297,6 +343,34 @@ class TestInterpolator:
         assert "Fy" in content
         assert "Fz" in content
 
+    def test_export_to_ansys_heat_gen(
+        self, create_sample_heat_gen_files, sample_config_heat_gen, temp_dir
+    ):
+        """Test exporting heat generation results to ANSYS format"""
+        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        interpolator = Interpolator(
+            path_to_src_folder=create_sample_heat_gen_files["src_folder"],
+            path_to_dest_mesh=create_sample_heat_gen_files["dest_mesh"],
+            config=sample_config_heat_gen,
+            file_idx=file_idx,
+        )
+
+        interpolator.interpolate_all()
+
+        output_dir = temp_dir / "output"
+        output_dir.mkdir()
+        interpolator.export_to_ansys(output_dir)
+
+        # Check that output file was created
+        output_files = list(output_dir.glob("interpolated_*.txt"))
+        assert len(output_files) == 1
+        assert output_files[0].name == "interpolated_heatgen_001.txt"
+
+        # Check file content format (should have HGEN)
+        content = output_files[0].read_text()
+        assert "HGEN" in content
+        assert "BF" in content
+
     def test_build_vtk_output_without_interpolation(
         self, create_sample_mesh_files, sample_config_heat_flux
     ):
@@ -417,6 +491,14 @@ class TestSelectTemplate:
         assert len(templates) == 1
         assert "HFLUX" in templates[0]
         assert "SFE" in templates[0]
+
+    def test_select_template_heat_gen(self):
+        """Test template selection for heat generation"""
+        templates = _select_template(INTERPOLATED_LOAD_TYPE.HEAT_GEN)
+
+        assert len(templates) == 1
+        assert "HGEN" in templates[0]
+        assert "BFE" in templates[0]
 
     def test_select_template_unsupported_type(self):
         """Test that unsupported load types raise NotImplementedError"""

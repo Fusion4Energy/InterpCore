@@ -63,6 +63,7 @@ interpolator.build_vtk_output(outdir="vtk_output")
 Complete working examples with sample data are available in the [`doc/`](doc/) folder:
 
 - **[Heat Flux Example](doc/heat_flux/)**: Scalar field interpolation using the AVERAGE kernel
+- **[Heat Generation Example](doc/heat_gen/)**: Volumetric heat generation using the CLOSEST kernel
 - **[EM Force Example](doc/em_force/)**: Vector field interpolation with glyph visualization
 
 Each example includes:
@@ -75,17 +76,29 @@ Each example includes:
 
 ### Query Methods
 - `QUERY_TYPE.K`: K-nearest neighbors (param = number of neighbors)
-- `QUERY_TYPE.RADIUS`: Radius-based search (param = radius in meters)
+- `QUERY_TYPE.RADIUS`: Radius-based search (param = radius in same unit as coordinates)
 
 ### Interpolation Kernels
+
+#### Source-to-target
+
+Each source point is distributed to destination neighbours:
+
 - `DISTANCE_WEIGHTED`: Weight by inverse distance
-- `AVERAGE`: Simple average of neighbors
-- `CLOSEST`: Use closest source point value
 - `FEM`: FEM-based interpolation
 
+
+#### Target-to-source 
+A value is assigned to each destination point based on source neighbours
+
+- `CLOSEST`: Use closest source point value
+- `AVERAGE`: Simple average of neighbors
+
 ### Load Types
-- `EM_FORCE`: 3-component vector fields (Fx, Fy, Fz)
-- `HEAT_FLUX`: Scalar fields
+- `EM_FORCE`: 3-component vector fields (Fx, Fy, Fz). If "vol" column is provided the forces are
+    interpreted as force densities and will be multiplied by the volume.
+- `HEAT_FLUX`: Scalar fields for surface heat flux
+- `HEAT_GEN`: Scalar fields for volumetric heat generation
 
 ## File Format
 
@@ -110,6 +123,14 @@ Node_ID X Y Z Fx Fy Fz
 Node_ID X Y Z HeatFlux
 1 0.50 0.50 0.00 100.00
 2 0.50 1.50 0.00 130.00
+...
+```
+
+### Source Data (Heat Generation)
+```
+Node_ID X Y Z HeatGen
+1 0.45 0.70 0.00 500.00
+2 0.45 1.50 0.00 550.00
 ...
 ```
 

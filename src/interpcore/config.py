@@ -18,6 +18,7 @@ class INTERPOLATED_LOAD_TYPE(Enum):
 
     EM_FORCE = "EM-Force"
     HEAT_FLUX = "Heat Flux"
+    HEAT_GEN = "Heat Generation"
 
 
 class INTERPOLATION_KERNEL(Enum):
@@ -76,6 +77,8 @@ class InterpolationConfig:
         if self.interpolated_load == INTERPOLATED_LOAD_TYPE.EM_FORCE:
             self.num_components = 3
         elif self.interpolated_load == INTERPOLATED_LOAD_TYPE.HEAT_FLUX:
+            self.num_components = 1
+        elif self.interpolated_load == INTERPOLATED_LOAD_TYPE.HEAT_GEN:
             self.num_components = 1
         else:
             raise ValueError(f"Unsupported load type: {self.interpolated_load}")
