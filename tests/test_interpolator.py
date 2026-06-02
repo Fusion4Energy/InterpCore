@@ -62,6 +62,20 @@ def sample_config_heat_gen():
 
 
 @pytest.fixture
+def sample_config_htc():
+    """Create a sample configuration for HTC interpolation"""
+    return InterpolationConfig(
+        method=QUERY_TYPE.K,
+        param=3,
+        max_distance=2.0,
+        coincidence_tolerance=1e-6,
+        kernel=INTERPOLATION_KERNEL.DISTANCE_WEIGHTED,
+        multithread=False,
+        interpolated_load=INTERPOLATED_LOAD_TYPE.HTC,
+    )
+
+
+@pytest.fixture
 def create_sample_mesh_files(temp_dir):
     """Create sample mesh and data files for testing"""
     # Create destination mesh file
@@ -147,6 +161,38 @@ def create_sample_heat_gen_files(temp_dir):
 1 0.5 0.5 0.0 500.0
 2 1.5 0.5 0.0 750.0
 3 0.5 1.5 0.0 600.0
+"""
+    src_file.write_text(src_content)
+
+    return {
+        "dest_mesh": str(dest_mesh),
+        "src_folder": str(src_folder),
+    }
+
+
+@pytest.fixture
+def create_sample_htc_files(temp_dir):
+    """Create sample mesh and HTC data files for testing"""
+    # Create destination mesh file
+    dest_mesh = temp_dir / "destination_mesh.txt"
+    dest_content = """Node_ID X Y Z
+501 0.0 0.0 0.0
+502 1.0 0.0 0.0
+503 2.0 0.0 0.0
+504 0.0 1.0 0.0
+"""
+    dest_mesh.write_text(dest_content)
+
+    # Create source data folder
+    src_folder = temp_dir / "htc_data"
+    src_folder.mkdir()
+
+    # Create source data file with HTC and reference temperature (2 components)
+    src_file = src_folder / "htc_001.txt"
+    src_content = """Node_ID X Y Z HTC Tref
+1 0.5 0.5 0.0 250.0 300.0
+2 1.5 0.5 0.0 300.0 310.0
+3 0.5 1.5 0.0 275.0 305.0
 """
     src_file.write_text(src_content)
 
@@ -267,6 +313,25 @@ class TestInterpolator:
         result = interpolator.interpolated_results["force_001"]
         assert result["interpolated"].shape[1] == 3  # EM force has 3 components
 
+    def test_interpolate_all_with_htc(self, create_sample_htc_files, sample_config_htc):
+        """Test interpolation with HTC data (2 components: HTC and Tref)"""
+        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        interpolator = Interpolator(
+            path_to_src_folder=create_sample_htc_files["src_folder"],
+            path_to_dest_mesh=create_sample_htc_files["dest_mesh"],
+            config=sample_config_htc,
+            file_idx=file_idx,
+        )
+
+        interpolator.interpolate_all()
+
+        assert interpolator.interpolated_results is not None
+        result = interpolator.interpolated_results["htc_001"]
+        assert "interpolated" in result
+        assert "unmapped" in result
+        assert result["interpolated"].shape[0] > 0
+        assert result["interpolated"].shape[1] == 2  # HTC has 2 components
+
     def test_export_to_ansys_without_interpolation(
         self, create_sample_mesh_files, sample_config_heat_flux, temp_dir
     ):
@@ -370,6 +435,34 @@ class TestInterpolator:
         content = output_files[0].read_text()
         assert "HGEN" in content
         assert "BF" in content
+
+    def test_export_to_ansys_htc(
+        self, create_sample_htc_files, sample_config_htc, temp_dir
+    ):
+        """Test exporting HTC results to ANSYS format"""
+        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        interpolator = Interpolator(
+            path_to_src_folder=create_sample_htc_files["src_folder"],
+            path_to_dest_mesh=create_sample_htc_files["dest_mesh"],
+            config=sample_config_htc,
+            file_idx=file_idx,
+        )
+
+        interpolator.interpolate_all()
+
+        output_dir = temp_dir / "output"
+        output_dir.mkdir()
+        interpolator.export_to_ansys(output_dir)
+
+        # Check that output file was created
+        output_files = list(output_dir.glob("interpolated_*.txt"))
+        assert len(output_files) == 1
+        assert output_files[0].name == "interpolated_htc_001.txt"
+
+        # Check file content format (should have CONV)
+        content = output_files[0].read_text()
+        assert "CONV" in content
+        assert "SFE" in content
 
     def test_build_vtk_output_without_interpolation(
         self, create_sample_mesh_files, sample_config_heat_flux
@@ -499,6 +592,16 @@ class TestSelectTemplate:
         assert len(templates) == 1
         assert "HGEN" in templates[0]
         assert "BFE" in templates[0]
+
+    def test_select_template_htc(self):
+        """Test template selection for HTC"""
+        templates = _select_template(INTERPOLATED_LOAD_TYPE.HTC)
+
+        assert len(templates) == 2
+        assert "CONV" in templates[0]
+        assert "SFE" in templates[0]
+        assert "CONV" in templates[1]
+        assert "SFE" in templates[1]
 
     def test_select_template_unsupported_type(self):
         """Test that unsupported load types raise NotImplementedError"""
