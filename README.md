@@ -9,6 +9,8 @@ A Python library for interpolating physical field data (electromagnetic forces, 
 - **Support for multiple load types**: 
   - EM forces (3-component vector fields)
   - Heat flux (scalar fields)
+  - Heat generation (volumetric)
+  - Heat Transfer Coefficient + bulk fluid temperature (convection BCs)
 - **Export to ANSYS APDL**: Direct export of interpolated results in APDL format
 - **Visualization**: Built-in VTK export for ParaView or PyVista visualization
 - **Efficient**: KDTree-based spatial queries for fast neighbor searches
@@ -62,9 +64,10 @@ interpolator.build_vtk_output(outdir="vtk_output")
 
 Complete working examples with sample data are available in the [`doc/`](doc/) folder:
 
-- **[Heat Flux Example](doc/heat_flux/)**: Scalar field interpolation using the AVERAGE kernel
-- **[Heat Generation Example](doc/heat_gen/)**: Volumetric heat generation using the CLOSEST kernel
-- **[EM Force Example](doc/em_force/)**: Vector field interpolation with glyph visualization
+- **[Heat Flux Example](doc/heat_flux/heat_flux.ipynb)**: Scalar field interpolation using the AVERAGE kernel
+- **[Heat Generation Example](doc/heat_gen/heat_gen.ipynb)**: Volumetric heat generation using the CLOSEST kernel
+- **[EM Force Example](doc/em_force/em_force.ipynb)**: Vector field interpolation with glyph visualization
+- **[HTC Example](doc/htc/htc.ipynb)**: Convection boundary condition interpolation (HTC + bulk fluid temperature) 
 
 Each example includes:
 - Sample mesh files
@@ -99,6 +102,7 @@ A value is assigned to each destination point based on source neighbours
     interpreted as force densities and will be multiplied by the volume.
 - `HEAT_FLUX`: Scalar fields for surface heat flux
 - `HEAT_GEN`: Scalar fields for volumetric heat generation
+- `HTC`: 2-component convection boundary condition — Heat Transfer Coefficient and bulk fluid (reference) temperature. Exported as `SFE,,CONV,1` and `SFE,,CONV,2` in APDL.
 
 ## File Format
 
