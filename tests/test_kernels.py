@@ -14,6 +14,7 @@ from interpcore.config import (
     INTERPOLATED_LOAD_TYPE,
     INTERPOLATION_KERNEL,
 )
+from interpcore.dest_tree import DestinationTree
 from interpcore.errors import InterpolationError
 
 
@@ -294,3 +295,34 @@ class TestKernels:
         assert interpolated[2, 0] == 0.0
         # Nothing should be unmapped
         assert np.all(unmapped == 0)
+
+    def test_destination_to_source_multithread_handles_empty_blocks(self, monkeypatch):
+        """Dest-to-source multithread should handle blocks larger than points without shape errors"""
+        dest_coords = np.array([[0.0, 0.0, 0.0], [10.0, 0.0, 0.0]])
+        src_coords = np.array([[0.0, 0.0, 0.0], [10.0, 0.0, 0.0]])
+        dest_ids = np.array([1, 2])
+        src_values = np.array([[100.0], [200.0]])
+
+        config = InterpolationConfig(
+            kernel=INTERPOLATION_KERNEL.CLOSEST,  # Dest-to-source mode
+            max_distance=1.0,
+            coincidence_tolerance=1e-9,
+            method=QUERY_TYPE.K,
+            param=1,
+            multithread=True,
+            interpolated_load=INTERPOLATED_LOAD_TYPE.HEAT_FLUX,
+        )
+
+        # Force more worker blocks than destination points (creates empty trailing blocks)
+        monkeypatch.setattr("interpcore.dest_tree.os.cpu_count", lambda: 4)
+
+        tree = DestinationTree(
+            dest_coordinates=dest_coords,
+            src_coordinates=src_coords,
+            dest_ids=dest_ids,
+            config=config,
+        )
+        interpolated, unmapped = tree.interpolate(src_values)
+
+        np.testing.assert_array_equal(interpolated, src_values)
+        np.testing.assert_array_equal(unmapped, np.zeros((1, 1)))
