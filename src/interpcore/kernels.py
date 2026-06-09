@@ -165,8 +165,9 @@ def interpolate_block(
         # Initialize output for destination points
         interpolated = np.zeros([neighbours_coords.shape[0], config.num_components])
     else:
-        # Initialize output for destination points (same size as chunked_coords)
-        interpolated = np.zeros([chunked_coords.shape[0], config.num_components])
+        # Initialize output only for the current destination chunk
+        block_size = max(chunk_idx.stop - chunk_idx.start, 0)
+        interpolated = np.zeros([block_size, config.num_components])
 
     unmapped = np.zeros([1, config.num_components])
 
