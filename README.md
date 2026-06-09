@@ -93,6 +93,7 @@ A value is assigned to each destination point based on source neighbours
 
 - `CLOSEST`: Use closest source point value
 - `AVERAGE`: Simple average of neighbors
+- `AVERAGE_WEIGHTED`: Average the neighbours values but weighting them by distance (the closer the more important).
 
 ### Load Types
 - `EM_FORCE`: 3-component vector fields (Fx, Fy, Fz). If "vol" column is provided the forces are

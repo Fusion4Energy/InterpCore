@@ -12,6 +12,7 @@ DEST_SRC_MAP = {
     INTERPOLATION_KERNEL.FEM: True,
     INTERPOLATION_KERNEL.AVERAGE: False,
     INTERPOLATION_KERNEL.CLOSEST: False,
+    INTERPOLATION_KERNEL.AVERAGE_WEIGHTED: False,
 }
 
 
@@ -81,6 +82,14 @@ def _FEM_interpolation_kernel(
     return True
 
 
+def _get_distance_weights(distances: np.ndarray) -> np.ndarray:
+    """Compute inverse distance weights"""
+    max_distance = np.max(distances)
+    weights = 1 / (distances / max_distance)  # inverse distance weights
+    weights /= np.sum(weights)  # normalize the weights so that they sum to 1
+    return weights
+
+
 def _dist_weight_kernel(
     distances: np.ndarray,
     dest_idx: np.ndarray,
@@ -90,9 +99,7 @@ def _dist_weight_kernel(
 ) -> bool:
     """simply distribute the value components proportionally to the inverse of the
     distance"""
-    max_distance = np.max(distances)
-    weights = 1 / (distances / max_distance)  # inverse distance weights
-    weights /= np.sum(weights)  # normalize the weights so that they sum to 1
+    weights = _get_distance_weights(distances)
     vector_interpolated[dest_idx, :] += weights * vector_to_interp[src_index]
 
     return True
@@ -103,10 +110,17 @@ def _average_kernel(
     dest_index: int,
     vector_to_interp: np.ndarray,
     vector_interpolated: np.ndarray,
+    distances: np.ndarray | None = None,
 ) -> bool:
     """Average the values from neighboring source points (dest-to-source mode)"""
-    # Average all neighboring source values
-    avg_value = np.mean(vector_to_interp[neighbours_idx, :], axis=0)
+    # if distances are provided, weight the average by inverse distance
+    if distances is not None:
+        weights = _get_distance_weights(distances)
+        weighted_values = vector_to_interp[neighbours_idx, :] * weights
+        avg_value = np.sum(weighted_values, axis=0)
+    else:
+        # Average all neighboring source values
+        avg_value = np.mean(vector_to_interp[neighbours_idx, :], axis=0)
     vector_interpolated[dest_index, :] = avg_value
     return True
 
@@ -236,6 +250,14 @@ def interpolate_block(
                     index,
                     src_values,
                     interpolated,
+                )
+            elif config.kernel == INTERPOLATION_KERNEL.AVERAGE_WEIGHTED:
+                mapped = _average_kernel(
+                    neighbours_idx,
+                    index,
+                    src_values,
+                    interpolated,
+                    distances=distances,
                 )
             elif config.kernel == INTERPOLATION_KERNEL.CLOSEST:
                 mapped = _closest_source_kernel(

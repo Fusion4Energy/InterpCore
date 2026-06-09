@@ -27,6 +27,7 @@ class INTERPOLATION_KERNEL(Enum):
     DISTANCE_WEIGHTED = "Weighted by distance"
     FEM = "FEM system"
     AVERAGE = "Average"
+    AVERAGE_WEIGHTED = "Weighted Average"
     CLOSEST = "Closest"
 
 

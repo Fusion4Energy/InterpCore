@@ -63,6 +63,32 @@ class TestKernels:
         expected = 150.0
         np.testing.assert_almost_equal(vector_interpolated[0, 0], expected)
 
+    def test_average_weighted_kernel(self):
+        """Test that the weighted average kernel gives more weight to closer source points"""
+        dest_point = np.array([[0.0, 0.0, 0.0]])
+        # Source 0 is at distance 1, source 1 is at distance 2
+        src_points = np.array([[1.0, 0.0, 0.0], [2.0, 0.0, 0.0]])
+
+        neighbours_idx = np.array([0, 1])
+        dest_index = 0
+
+        distances = euclidean_distances(src_points, dest_point)  # shape (2, 1)
+
+        vector_to_interp = np.array([[100.0], [200.0]])
+        vector_interpolated = np.zeros((1, 1))
+
+        result = _average_kernel(
+            neighbours_idx, dest_index, vector_to_interp, vector_interpolated, distances=distances
+        )
+
+        assert result is True
+        # weights: w0 = 1/1 = 2, w1 = 1/2 = 1  (after normalisation: 2/3, 1/3)
+        # expected = 100 * 2/3 + 200 * 1/3 = 133.333...
+        expected = 100.0 * (2.0 / 3.0) + 200.0 * (1.0 / 3.0)
+        np.testing.assert_almost_equal(vector_interpolated[0, 0], expected)
+        # Result must be closer to the nearer source (100) than the plain average (150)
+        assert vector_interpolated[0, 0] < 150.0
+
     def test_closest_source_kernel(self):
         """Test that the closest source kernel produces expected results for a simple case"""
         # Simple case: 1 destination picking closest of 3 sources
