@@ -11,6 +11,9 @@ A Python library for interpolating physical field data (electromagnetic forces, 
   - Heat flux (scalar fields)
   - Heat generation (volumetric)
   - Heat Transfer Coefficient + bulk fluid temperature (convection BCs)
+- **Analysis tools**:
+  - Scalar field integration for computing total heat generation, flux, etc.
+  - EM force resultant computation for validating force/moment conservation
 - **Export to ANSYS APDL**: Direct export of interpolated results in APDL format
 - **Visualization**: Built-in VTK export for ParaView or PyVista visualization
 - **Efficient**: KDTree-based spatial queries for fast neighbor searches
@@ -59,6 +62,58 @@ interpolator.export_to_ansys("output_directory")
 # Optional: Build VTK for visualization. If outdir=None they are not exported
 interpolator.build_vtk_output(outdir="vtk_output")
 ```
+
+## Analysis Methods
+
+After interpolation, InterpCore provides methods to analyze and validate results:
+
+### Scalar Integrals
+
+For scalar fields (heat flux, heat generation), you can compute the total integral over the destination mesh:
+
+```python
+# Requires volume or area data in the destination mesh
+file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4, "vol": 4}  # or "area": 5
+
+interpolator = Interpolator(
+    path_to_src_folder="source_data",
+    path_to_dest_mesh="destination_mesh.txt",
+    config=config,
+    file_idx=file_idx
+)
+
+interpolator.interpolate_all()
+
+# Compute integrals (e.g., total heat generation in W)
+integrals = interpolator.compute_scalar_integrals()
+# Returns: {"data_001": array([total_value])}
+```
+
+**Note**: The destination mesh must include volume (for 3D elements) or area (for 2D elements) data. Use the APDL scripts in [`apdl-scripts/`](apdl-scripts/) to export element centroids with volumes and areas.
+
+### EM Force Resultants
+
+For EM force fields, you can compute force and moment resultants to verify conservation:
+
+```python
+# After interpolation with EM_FORCE load type
+resultants = interpolator.compute_EM_resultants(pole=np.array([0.0, 0.0, 0.0]))
+
+# Returns for each source file:
+# {
+#     "force_001": {
+#         "R_F_EM": [Fx, Fy, Fz],           # Total force from source data
+#         "R_F_Mech": [Fx, Fy, Fz],         # Total force from interpolated data
+#         "R_M_EM": [Mx, My, Mz],           # Total moment from source data
+#         "R_M_Mech": [Mx, My, Mz],         # Total moment from interpolated data
+#         "f_err_comp": [ex, ey, ez],       # Relative force error by component
+#         "m_err_comp": [ex, ey, ez],       # Relative moment error by component
+#         "Unmapped_EM_Force": float        # Norm of unmapped forces
+#     }
+# }
+```
+
+This is useful for validating that the interpolation preserves global force and moment equilibrium. Small errors indicate good interpolation quality.
 
 ## Examples
 

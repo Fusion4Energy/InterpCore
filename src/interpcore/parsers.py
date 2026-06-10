@@ -6,8 +6,12 @@ from interpcore.config import INTERPOLATED_LOAD_TYPE
 
 
 def parse_mech_mesh(
-    filepath: Path, col_mesh_ids: int = 0, col_mesh_x: int = 1
-) -> tuple[np.ndarray, np.ndarray]:
+    filepath: Path,
+    col_mesh_ids: int = 0,
+    col_mesh_x: int = 1,
+    col_vol: int | None = None,
+    col_area: int | None = None,
+) -> dict[str, np.ndarray]:
     """Parse a mechanical mesh and return the array of coordinates and the vector
     of node numbers
 
@@ -19,6 +23,10 @@ def parse_mech_mesh(
         index of the column containing node/element numbers, by default 0
     col_mesh_x : int, optional
         index of the column containing x coordinates, by default 1
+    col_vol : int, optional
+        index of the column containing volume information, by default None
+    col_area : int, optional
+        index of the column containing area information, by default None
 
     Returns
     -------
@@ -35,7 +43,12 @@ def parse_mech_mesh(
 
     coordinates = Detailed_mesh[:, col_mesh_x : col_mesh_x + 3]
     id_numbers = Detailed_mesh[:, col_mesh_ids]
-    return coordinates, id_numbers
+    result = {"coordinates": coordinates, "id_numbers": id_numbers}
+    if col_vol is not None:
+        result["volumes"] = Detailed_mesh[:, col_vol]
+    if col_area is not None:
+        result["areas"] = Detailed_mesh[:, col_area]
+    return result
 
 
 class CloudParser:

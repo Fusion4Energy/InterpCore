@@ -26,6 +26,8 @@ CMSEL,S,%named_selection%
 ! Allocate arrays
 *DIM, nGs, ARRAY, nE, 3		! element centroid coordinates
 *DIM, nTId,ARRAY, nE        ! element ids
+*DIM, nArea,ARRAY, nE       ! element area
+*DIM, nVol,ARRAY, nE        ! element volume
 
 ! Loop through selected elements and store centroids
 *DO,i,1,nE				    ! loop on selected elements
@@ -33,22 +35,31 @@ CMSEL,S,%named_selection%
     nGs(i,1) = CENTRX(iE)	! centroid X
     nGs(i,2) = CENTRY(iE)	! centroid Y
     nGs(i,3) = CENTRZ(iE)	! centroid Z
+    
+    ! Get area and volume using *GET
+    *GET,area_val,ELEM,iE,AREA
+    *GET,vol_val,ELEM,iE,VOLU
+    nArea(i) = area_val		! element area
+    nVol(i)  = vol_val		! element volume
+    
     iE       = ELNEXT(iE)
 *ENDDO
 
 ! Write results to CSV file
 *CFOPEN,%output_file%,csv
 ! Write header
-*VWRITE,'Element_ID','X','Y','Z'
-(A,',',A,',',A,',',A)
+*VWRITE,'Element_ID','X','Y','Z','Area','Volume'
+(A,',',A,',',A,',',A,',',A,',',A)
 ! Write data
-*VWRITE,nTId(1),nGs(1,1),nGs(1,2),nGs(1,3)
-(F10.0,',',E16.9,',',E16.9,',',E16.9)
+*VWRITE,nTId(1),nGs(1,1),nGs(1,2),nGs(1,3),nArea(1),nVol(1)
+(F10.0,',',E16.9,',',E16.9,',',E16.9,',',E16.9,',',E16.9)
 *CFCLOS
 
 ! Clean up arrays
 *DIM, nGs, DELETE
 *DIM, nTId, DELETE
+*DIM, nArea, DELETE
+*DIM, nVol, DELETE
 
 *MSG,INFO
 Read CDB file '%cdb_file%.cdb' and exported %nE% element centroids from '%named_selection%' to %output_file%.csv
