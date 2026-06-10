@@ -1,6 +1,7 @@
 import pytest
 import tempfile
 import shutil
+import numpy as np
 from pathlib import Path
 from interpcore.interpolator import Interpolator, _select_template
 from interpcore.config import (
@@ -563,6 +564,152 @@ class TestInterpolator:
         interpolator.interpolate_all()
         assert interpolator.interpolated_results is not None
         assert len(interpolator.interpolated_results) == 3
+
+    def test_compute_scalar_integrals(self, temp_dir, sample_config_heat_gen):
+        """Test computing scalar integrals with volume data"""
+        # Create destination mesh with volume column
+        dest_mesh = temp_dir / "destination_mesh.txt"
+        dest_content = """Node_ID X Y Z Volume
+401 0.0 0.0 0.0 0.001
+402 1.0 0.0 0.0 0.002
+403 2.0 0.0 0.0 0.0015
+"""
+        dest_mesh.write_text(dest_content)
+
+        # Create source data folder with heat generation
+        src_folder = temp_dir / "heat_gen_data"
+        src_folder.mkdir()
+
+        src_file = src_folder / "heatgen_001.txt"
+        src_content = """Node_ID X Y Z HeatGen
+1 0.5 0.0 0.0 1000.0
+2 1.5 0.0 0.0 2000.0
+3 2.5 0.0 0.0 1500.0
+"""
+        src_file.write_text(src_content)
+
+        # Create interpolator with volume data
+        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4, "vol": 4}
+        interpolator = Interpolator(
+            path_to_src_folder=str(src_folder),
+            path_to_dest_mesh=str(dest_mesh),
+            config=sample_config_heat_gen,
+            file_idx=file_idx,
+        )
+
+        # Run interpolation
+        interpolator.interpolate_all()
+
+        # Compute integrals
+        integrals = interpolator.compute_scalar_integrals()
+
+        # Verify results
+        assert integrals is not None
+        assert "heatgen_001" in integrals
+        assert isinstance(integrals["heatgen_001"], np.ndarray)
+        assert integrals["heatgen_001"].size == 1  # Scalar result
+        assert integrals["heatgen_001"][0] > 0  # Should be positive heat generation
+
+    def test_compute_scalar_integrals_without_interpolation(
+        self, create_sample_heat_gen_files, sample_config_heat_gen
+    ):
+        """Test that compute_scalar_integrals raises ValueError before interpolation"""
+        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        interpolator = Interpolator(
+            path_to_src_folder=create_sample_heat_gen_files["src_folder"],
+            path_to_dest_mesh=create_sample_heat_gen_files["dest_mesh"],
+            config=sample_config_heat_gen,
+            file_idx=file_idx,
+        )
+
+        with pytest.raises(
+            ValueError, match="No interpolated results found. Run interpolate_all"
+        ):
+            interpolator.compute_scalar_integrals()
+
+    def test_compute_em_resultants(
+        self, create_sample_em_force_files, sample_config_em_force
+    ):
+        """Test computing EM force and moment resultants"""
+        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        interpolator = Interpolator(
+            path_to_src_folder=create_sample_em_force_files["src_folder"],
+            path_to_dest_mesh=create_sample_em_force_files["dest_mesh"],
+            config=sample_config_em_force,
+            file_idx=file_idx,
+        )
+
+        # Run interpolation
+        interpolator.interpolate_all()
+
+        # Compute EM resultants with default pole (0, 0, 0)
+        resultants = interpolator.compute_EM_resultants()
+
+        # Verify results
+        assert resultants is not None
+        assert "force_001" in resultants
+
+        result = resultants["force_001"]
+        assert "R_F_EM" in result
+        assert "R_F_Mech" in result
+        assert "R_M_EM" in result
+        assert "R_M_Mech" in result
+        assert "f_err_comp" in result
+        assert "m_err_comp" in result
+        assert "Unmapped_EM_Force" in result
+
+        # Check that force resultants are 3D vectors
+        assert isinstance(result["R_F_EM"], np.ndarray)
+        assert isinstance(result["R_F_Mech"], np.ndarray)
+        assert isinstance(result["R_M_EM"], np.ndarray)
+        assert isinstance(result["R_M_Mech"], np.ndarray)
+        assert len(result["R_F_EM"]) == 3
+        assert len(result["R_F_Mech"]) == 3
+        assert len(result["R_M_EM"]) == 3
+        assert len(result["R_M_Mech"]) == 3
+
+    def test_compute_em_resultants_with_custom_pole(
+        self, create_sample_em_force_files, sample_config_em_force
+    ):
+        """Test computing EM resultants with custom reference pole"""
+        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        interpolator = Interpolator(
+            path_to_src_folder=create_sample_em_force_files["src_folder"],
+            path_to_dest_mesh=create_sample_em_force_files["dest_mesh"],
+            config=sample_config_em_force,
+            file_idx=file_idx,
+        )
+
+        interpolator.interpolate_all()
+
+        # Compute with custom pole
+        custom_pole = np.array([1.0, 1.0, 1.0])
+        resultants = interpolator.compute_EM_resultants(pole=custom_pole)
+
+        # Verify results exist and are different from default pole
+        assert resultants is not None
+        assert "force_001" in resultants
+
+        result = resultants["force_001"]
+        assert "R_M_EM" in result
+        assert "R_M_Mech" in result
+
+    def test_compute_em_resultants_without_interpolation(
+        self, create_sample_em_force_files, sample_config_em_force
+    ):
+        """Test that compute_EM_resultants raises ValueError before interpolation"""
+        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        interpolator = Interpolator(
+            path_to_src_folder=create_sample_em_force_files["src_folder"],
+            path_to_dest_mesh=create_sample_em_force_files["dest_mesh"],
+            config=sample_config_em_force,
+            file_idx=file_idx,
+        )
+
+        with pytest.raises(
+            ValueError, match="No interpolated results found. Run interpolate_all"
+        ):
+            interpolator.compute_EM_resultants()
 
 
 class TestSelectTemplate:

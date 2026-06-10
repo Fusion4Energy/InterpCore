@@ -2,10 +2,11 @@ from interpcore.config import InterpolationConfig, INTERPOLATED_LOAD_TYPE
 from pathlib import Path
 from interpcore.parsers import parse_mech_mesh, parse_values
 from interpcore.dest_tree import DestinationTree
+from interpcore.errors import IncompatibleResultsError
 import os
 import pyvista as pv
 import logging
-
+import numpy as np
 from tqdm import tqdm
 
 
@@ -32,13 +33,20 @@ class Interpolator:
         """
         # parse all necessary files
         if file_idx is None:
-            mech_x, ids = parse_mech_mesh(Path(path_to_dest_mesh))
+            mesh_data = parse_mech_mesh(Path(path_to_dest_mesh))
         else:
-            mech_x, ids = parse_mech_mesh(
+            mesh_data = parse_mech_mesh(
                 Path(path_to_dest_mesh),
                 col_mesh_ids=file_idx.get("ids", 0),
                 col_mesh_x=file_idx.get("dest_x", 1),
+                col_vol=file_idx.get("vol", None),
+                col_area=file_idx.get("area", None),
             )
+
+        mech_x = mesh_data["coordinates"]
+        ids = mesh_data["id_numbers"]
+        self.volumes = mesh_data.get("volumes", None)
+        self.areas = mesh_data.get("areas", None)
 
         # parse all value files to interpolate
         src_values = {}
@@ -129,55 +137,89 @@ class Interpolator:
 
         logging.info(f"ANSYS files exported to {outdir}")
 
-    # def _compute_resultants(self, name: str, pole: np.ndarray | None = None) -> dict:
-    #     if pole is None:
-    #         pole = np.array([0.0, 0.0, 0.0])
+    def compute_scalar_integrals(self) -> dict[str, float]:
+        """Compute the integrals of the interpolated results over the destination mesh"""
+        if self.interpolated_results is None:
+            raise ValueError(
+                "No interpolated results found. Run interpolate_all() first."
+            )
 
-    #     F_EM = self.src_values[name]
-    #     if self.interpolated_results is None:
-    #         raise ValueError(
-    #             "No interpolated results found. Run interpolate_all() first."
-    #         )
-    #     F_Mech = self.interpolated_results[name]["interpolated"]
+        integrals = {}
+        for name, result in self.interpolated_results.items():
+            if self.tree.config.num_components > 1:
+                raise IncompatibleResultsError(
+                    "Integral computation only supported for scalar results (num_components=1)."
+                )
+            if self.volumes is not None:
+                integral = np.sum(
+                    result["interpolated"] * self.volumes[:, np.newaxis], axis=0
+                )
+            elif self.areas is not None:
+                integral = np.sum(
+                    result["interpolated"] * self.areas[:, np.newaxis], axis=0
+                )
+            else:
+                raise IncompatibleResultsError(
+                    "No volume or area information found. Cannot compute integrals."
+                )
+            integrals[name] = integral
 
-    #     R_F_EM = np.sum(F_EM, axis=0)
-    #     R_F_Mech = np.sum(F_Mech, axis=0)
+        return integrals
 
-    #     M_EM = np.cross(self.em_x - pole, F_EM)
-    #     M_Mech = np.cross(self.mech_x - pole, F_Mech)
+    def compute_EM_resultants(
+        self, pole: np.ndarray | None = None
+    ) -> dict[str, dict[str, float]]:
+        """Compute the force and moment resultants of the EM forces and the interpolated
+        forces, and their differences
 
-    #     R_M_EM = np.sum(M_EM, axis=0)
-    #     R_M_Mech = np.sum(M_Mech, axis=0)
+        Parameters
+        ----------
+        pole : np.ndarray | None, optional
+            reference pole for moment calculation, by default None (0,0,0)
 
-    #     f_err_comp = np.divide(R_F_EM - R_F_Mech, R_F_EM)
-    #     m_err_comp = np.divide(R_M_EM - R_M_Mech, R_M_EM)
+        Returns
+        -------
+        dict[str, dict[str, float]]
+            dictionary containing the resultants and their differences for each
+            interpolated load
+        """
+        if self.interpolated_results is None:
+            raise ValueError(
+                "No interpolated results found. Run interpolate_all() first."
+            )
+        if pole is None:
+            pole = np.array([0.0, 0.0, 0.0])
 
-    #     # give some warning if differences are very high
-    #     if np.any(np.abs(f_err_comp) > 0.2):
-    #         logging.warning(f"High difference in force resultant for {name}")
-    #     if np.any(np.abs(m_err_comp) > 0.2):
-    #         logging.warning(f"High difference in moment resultant for {name}")
+        resultants = {}
+        for name in self.src_values.keys():
+            F_EM = self.src_values[name]
+            F_Mech = self.interpolated_results[name]["interpolated"]
 
-    #     row = {
-    #         "Name": name,
-    #         "Fx [N]": R_F_EM[0],
-    #         "Fy [N]": R_F_EM[1],
-    #         "Fz [N]": R_F_EM[2],
-    #         "Mx [Nm]": R_M_EM[0],
-    #         "My [Nm]": R_M_EM[1],
-    #         "Mz [Nm]": R_M_EM[2],
-    #         "dFx [%]": f_err_comp[0] * 100,
-    #         "dFy [%]": f_err_comp[1] * 100,
-    #         "dFz [%]": f_err_comp[2] * 100,
-    #         "dMx [%]": m_err_comp[0] * 100,
-    #         "dMy [%]": m_err_comp[1] * 100,
-    #         "dMz [%]": m_err_comp[2] * 100,
-    #         "Unmapped_EM_Force [N]": np.linalg.norm(
-    #             self.interpolated_results[name]["unmapped"]
-    #         ),
-    #     }
+            R_F_EM = np.sum(F_EM, axis=0)
+            R_F_Mech = np.sum(F_Mech, axis=0)
 
-    #     return row
+            M_EM = np.cross(self.tree.src_coordinates - pole, F_EM)
+            M_Mech = np.cross(self.tree.dest_coordinates - pole, F_Mech)
+
+            R_M_EM = np.sum(M_EM, axis=0)
+            R_M_Mech = np.sum(M_Mech, axis=0)
+
+            f_err_comp = np.divide(R_F_EM - R_F_Mech, R_F_EM)
+            m_err_comp = np.divide(R_M_EM - R_M_Mech, R_M_EM)
+
+            resultants[name] = {
+                "R_F_EM": R_F_EM,
+                "R_F_Mech": R_F_Mech,
+                "R_M_EM": R_M_EM,
+                "R_M_Mech": R_M_Mech,
+                "f_err_comp": f_err_comp,
+                "m_err_comp": m_err_comp,
+                "Unmapped_EM_Force": np.linalg.norm(
+                    self.interpolated_results[name]["unmapped"]
+                ),
+            }
+
+        return resultants
 
     def build_vtk_output(self, outdir: Path | None = None):
         """Build the VTK output files for visualization
