@@ -266,7 +266,7 @@ class Interpolator:
             if outdir is not None:
                 outfile = Path(outdir, f"{name}_interpolated.vtk")
                 self.dest_vtk[name].save(outfile)
-                outfile_em = Path(outdir, f"{name}_EM.vtk")
+                outfile_em = Path(outdir, f"{name}_src.vtk")
                 self.src_vtk[name].save(outfile_em)
 
 
