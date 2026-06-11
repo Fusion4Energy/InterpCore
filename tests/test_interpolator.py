@@ -528,7 +528,7 @@ class TestInterpolator:
         # Check file names
         file_names = [f.name for f in vtk_files]
         assert "data_001_interpolated.vtk" in file_names
-        assert "data_001_EM.vtk" in file_names
+        assert "data_001_src.vtk" in file_names
 
     def test_multiple_source_files(self, temp_dir, sample_config_heat_flux):
         """Test interpolation with multiple source data files"""
