@@ -23,7 +23,8 @@ class Interpolator:
         Parameters
         ----------
         path_to_src_folder : str
-            path where the input cloud points are stored
+            path where the input cloud points are stored. Also a single
+            file is accepted.
         path_to_dest_mesh : str
             path to the mechanical mesh file
         config : InterpolationConfig
@@ -51,16 +52,9 @@ class Interpolator:
         # parse all value files to interpolate
         src_values = {}
 
-        # raise an error if folder does not exist or is empty
-        if not os.path.exists(path_to_src_folder):
-            raise FileNotFoundError(
-                f"Source folder {path_to_src_folder} does not exist."
-            )
-        if len(os.listdir(path_to_src_folder)) == 0:
-            raise FileNotFoundError(f"Source folder {path_to_src_folder} is empty.")
-
-        for file in os.listdir(path_to_src_folder):
-            file_path = Path(path_to_src_folder, file)
+        # allow also a file
+        if os.path.isfile(path_to_src_folder):
+            file_path = Path(path_to_src_folder)
             name = file_path.stem
             src_coordinates, values = parse_values(
                 file_path,
@@ -69,6 +63,25 @@ class Interpolator:
                 n_components=config.num_components,
             )
             src_values[name] = values
+        else:
+            # raise an error if folder does not exist or is empty
+            if not os.path.exists(path_to_src_folder):
+                raise FileNotFoundError(
+                    f"Source folder {path_to_src_folder} does not exist."
+                )
+            if len(os.listdir(path_to_src_folder)) == 0:
+                raise FileNotFoundError(f"Source folder {path_to_src_folder} is empty.")
+
+            for file in os.listdir(path_to_src_folder):
+                file_path = Path(path_to_src_folder, file)
+                name = file_path.stem
+                src_coordinates, values = parse_values(
+                    file_path,
+                    load_type=config.interpolated_load,
+                    file_idx=file_idx,
+                    n_components=config.num_components,
+                )
+                src_values[name] = values
 
         self.src_values = src_values
 

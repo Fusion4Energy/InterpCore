@@ -206,6 +206,7 @@ def create_sample_htc_files(temp_dir):
 class TestInterpolator:
     """Tests for Interpolator class"""
 
+
     def test_initialization_with_valid_inputs(
         self, create_sample_mesh_files, sample_config_heat_flux
     ):
