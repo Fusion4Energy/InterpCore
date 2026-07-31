@@ -3,17 +3,7 @@ from interpcore.config import InterpolationConfig, INTERPOLATION_KERNEL
 from sklearn.metrics.pairwise import euclidean_distances
 import logging
 from interpcore.errors import InterpolationError
-
-
-# If true, the method tends to distribute each source point to the destination mesh
-# If false, the method loops on each dest point and assigns a value depeding on neighbouring source points
-DEST_SRC_MAP = {
-    INTERPOLATION_KERNEL.DISTANCE_WEIGHTED: True,
-    INTERPOLATION_KERNEL.FEM: True,
-    INTERPOLATION_KERNEL.AVERAGE: False,
-    INTERPOLATION_KERNEL.CLOSEST: False,
-    INTERPOLATION_KERNEL.AVERAGE_WEIGHTED: False,
-}
+from interpcore.config import DEST_SRC_MAP
 
 
 # --- interpolation kernels ---

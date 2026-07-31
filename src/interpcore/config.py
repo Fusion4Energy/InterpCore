@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING
+from interpcore.errors import ConfigurationError
+from pathlib import Path
 
 if TYPE_CHECKING:
     from interpcore.kernels import INTERPOLATION_KERNEL
@@ -30,6 +32,17 @@ class INTERPOLATION_KERNEL(Enum):
     AVERAGE = "Average"
     AVERAGE_WEIGHTED = "Weighted Average"
     CLOSEST = "Closest"
+
+
+# If true, the method tends to distribute each source point to the destination mesh
+# If false, the method loops on each dest point and assigns a value depeding on neighbouring source points
+DEST_SRC_MAP = {
+    INTERPOLATION_KERNEL.DISTANCE_WEIGHTED: True,
+    INTERPOLATION_KERNEL.FEM: True,
+    INTERPOLATION_KERNEL.AVERAGE: False,
+    INTERPOLATION_KERNEL.CLOSEST: False,
+    INTERPOLATION_KERNEL.AVERAGE_WEIGHTED: False,
+}
 
 
 @dataclass
@@ -78,7 +91,7 @@ class InterpolationConfig:
             try:
                 self.param = int(self.param)
             except (TypeError, ValueError):
-                raise ValueError("Parameter for K query must be an integer.")
+                raise ConfigurationError("Parameter for K query must be an integer.")
 
         # assign the correct number of components depeding on the load type
         if self.interpolated_load == INTERPOLATED_LOAD_TYPE.EM_FORCE:
@@ -90,4 +103,48 @@ class InterpolationConfig:
         elif self.interpolated_load == INTERPOLATED_LOAD_TYPE.HTC:
             self.num_components = 2
         else:
-            raise ValueError(f"Unsupported load type: {self.interpolated_load}")
+            raise ConfigurationError(f"Unsupported load type: {self.interpolated_load}")
+
+        # ensure that kernels are not used in incompatible ways with the load type
+        if not _is_compatible(self.kernel, self.interpolated_load):
+            raise ConfigurationError(
+                f"Incompatible kernel {self.kernel} for load type {self.interpolated_load}"
+            )
+
+
+@dataclass
+class ColumnsConfig:
+    """Describe the indices of the columns of both the source file(s) and of the
+    destination mesh file. Indices are 0-based, i.e., the first column has index 0.
+
+    Parameters
+    ----------
+    source_xyz : int
+        Index of the first column containing the x coordinate of the source mesh.
+        y, and z coordinates are expected to be in the next two columns.
+    value : int
+        Index of the column containing the values to be interpolated from the source mesh.
+    dest_xyz : int
+        Index of the first column containing the x coordinate of the destination mesh.
+        y, and z coordinates are expected to be in the next two columns.
+    id : int
+        Index of the column containing the destination mesh node IDs.
+    volume_area : int | None, optional
+        Index of the column containing the volume or area of the destination mesh.
+    """
+
+    source_xyz: int
+    value: int
+    dest_xyz: int
+    id: int
+    volume_area: int | None = None
+
+
+def _is_compatible(
+    kernel: INTERPOLATION_KERNEL, load_type: INTERPOLATED_LOAD_TYPE
+) -> bool:
+    if DEST_SRC_MAP[kernel] and load_type != INTERPOLATED_LOAD_TYPE.EM_FORCE:
+        return False
+    if not DEST_SRC_MAP[kernel] and load_type == INTERPOLATED_LOAD_TYPE.EM_FORCE:
+        return False
+    return True

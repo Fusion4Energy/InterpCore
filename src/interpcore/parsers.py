@@ -2,7 +2,7 @@ from pathlib import Path
 import logging
 import pandas as pd
 import numpy as np
-from interpcore.config import INTERPOLATED_LOAD_TYPE
+from interpcore.config import INTERPOLATED_LOAD_TYPE, ColumnsConfig
 
 
 def parse_mech_mesh(
@@ -164,7 +164,7 @@ def _detect_delimiter(csvFile: Path, skip: int) -> np.ndarray:
 def parse_values(
     filepath: Path,
     load_type: INTERPOLATED_LOAD_TYPE,
-    file_idx: dict,
+    columns: ColumnsConfig,
     n_components: int,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Parse values to be interpolated
@@ -175,8 +175,8 @@ def parse_values(
         path to the source file
     load_type : INTERPOLATED_LOAD_TYPE
         type of load to be interpolated
-    file_idx : dict
-        indices map to correctly read the source file
+    columns : ColumnsConfig
+        column indices for parsing the source file
     n_components : int
         number of components to extract
 
@@ -191,13 +191,13 @@ def parse_values(
     if load_type == INTERPOLATED_LOAD_TYPE.EM_FORCE:
         parser = EMCloudParser(filepath)
         values = parser.get_values(
-            val_idx=file_idx.get("val", 3),
+            val_idx=columns.value,
             n_components=n_components,
-            v_idx=file_idx.get("volume", None),
+            v_idx=columns.volume_area,
         )
     else:
         parser = CloudParser(filepath)
-        values = parser.get_values(val_idx=file_idx["val"], n_components=n_components)
+        values = parser.get_values(val_idx=columns.value, n_components=n_components)
 
-    coordinates = parser.get_coordinates(col_mesh_x=file_idx["src_x"])
+    coordinates = parser.get_coordinates(col_mesh_x=columns.source_xyz)
     return coordinates, values

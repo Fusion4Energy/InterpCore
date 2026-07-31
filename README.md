@@ -28,29 +28,34 @@ pip install interpcore
 
 ```python
 from interpcore.interpolator import Interpolator
-from interpcore.config import InterpolationConfig, QUERY_TYPE, INTERPOLATED_LOAD_TYPE
+from interpcore.config import (
+    InterpolationConfig,
+    ColumnsConfig,
+    QUERY_TYPE,
+    INTERPOLATED_LOAD_TYPE,
+)
 from interpcore.kernels import INTERPOLATION_KERNEL
 
 # Configure interpolation
 config = InterpolationConfig(
     method=QUERY_TYPE.K,  # type of neighbour search
     param=5,  # parameter relative to the neighbour search (K or radius)
-    max_distance=2.0, # filter by a max radius of search (in case of K is used)
-    coincidence_tolerance=0.01, # tolerance to consider two nodes coincident
-    kernel=INTERPOLATION_KERNEL.DISTANCE_WEIGHTED, # How to interpolate
-    multithread=False, # use or not multithread
-    interpolated_load=INTERPOLATED_LOAD_TYPE.EM_FORCE # type of load that is being interpolated
+    max_distance=2.0,  # filter by a max radius of search (in case of K is used)
+    coincidence_tolerance=0.01,  # tolerance to consider two nodes coincident
+    kernel=INTERPOLATION_KERNEL.DISTANCE_WEIGHTED,  # How to interpolate
+    multithread=False,  # use or not multithread
+    interpolated_load=INTERPOLATED_LOAD_TYPE.EM_FORCE,  # type of load that is being interpolated
 )
 
-# Define file column indices. This gives the column index in the input files
-file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+# Define column indices for the input files
+columns = ColumnsConfig(id=0, dest_xyz=1, source_xyz=1, value=4)
 
 # Create interpolator and run
 interpolator = Interpolator(
     path_to_src_folder="source_data",
     path_to_dest_mesh="destination_mesh.txt",
     config=config,
-    file_idx=file_idx
+    columns=columns,
 )
 
 # Interpolate all source files
@@ -63,6 +68,41 @@ interpolator.export_to_ansys("output_directory")
 interpolator.build_vtk_output(outdir="vtk_output")
 ```
 
+## Interpolation Configuration
+
+Two dataclass objects fully control how the interpolation is performed.
+
+### `InterpolationConfig`
+
+Controls the spatial search strategy, the interpolation kernel, and the target load type.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `method` | `QUERY_TYPE` | Neighbour search strategy: `QUERY_TYPE.K` (K-nearest) or `QUERY_TYPE.RADIUS` (radius-based). |
+| `param` | `int \| float` | Parameter for the chosen method: number of neighbours for `K`, radius (same unit as coordinates) for `RADIUS`. |
+| `max_distance` | `float` | Maximum distance (same unit as coordinates) beyond which a destination node is not considered a neighbour, even when using `QUERY_TYPE.K`. Acts as a hard cutoff. |
+| `coincidence_tolerance` | `float` | Distance below which two nodes are treated as coincident and the source value is copied directly without interpolation. |
+| `kernel` | `INTERPOLATION_KERNEL` | Algorithm used to assign a value from the neighbourhood. See [Interpolation Kernels](#interpolation-kernels). |
+| `multithread` | `bool` | Whether to parallelise the interpolation loop using threads. |
+| `interpolated_load` | `INTERPOLATED_LOAD_TYPE` | Physical quantity being interpolated. Determines the number of components and the APDL export format. |
+| `accept_no_neighbor` | `bool` | If `False` (default), raise an error when a destination node has no neighbour within `max_distance`. If `True`, assign zero to those nodes silently. |
+
+> **Note**: not every kernel is compatible with every load type. See [Kernel–Load Compatibility](#kernel-load-compatibility).
+
+### `ColumnsConfig`
+
+Describes the zero-based column indices in both the source data files and the destination mesh file. All three coordinate components (x, y, z) are expected in consecutive columns starting at the given index.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `source_xyz` | `int` | Index of the **x** column in the source file; y and z must follow immediately. |
+| `value` | `int` | Index of the column containing the scalar (or first component) value to interpolate from the source file. |
+| `dest_xyz` | `int` | Index of the **x** column in the destination mesh file; y and z must follow immediately. |
+| `id` | `int` | Index of the node-ID column in the destination mesh file. |
+| `volume_area` | `int \| None` | Index of the volume/area column in the destination mesh file. Required for scalar integrals and for EM force density inputs. |
+
+## Interpolation checks and outputs
+
 ## Analysis Methods
 
 After interpolation, InterpCore provides methods to analyze and validate results:
@@ -73,13 +113,15 @@ For scalar fields (heat flux, heat generation), you can compute the total integr
 
 ```python
 # Requires volume or area data in the destination mesh
-file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4, "vol": 4}  # or "area": 5
+columns = ColumnsConfig(
+    id=0, dest_xyz=1, source_xyz=1, value=4, volume_area=4
+)  # volume_area points to the vol/area column
 
 interpolator = Interpolator(
     path_to_src_folder="source_data",
     path_to_dest_mesh="destination_mesh.txt",
     config=config,
-    file_idx=file_idx
+    columns=columns,
 )
 
 interpolator.interpolate_all()
@@ -159,6 +201,20 @@ A value is assigned to each destination point based on source neighbours
 - `HEAT_FLUX`: Scalar fields for surface heat flux
 - `HEAT_GEN`: Scalar fields for volumetric heat generation
 - `HTC`: 2-component convection boundary condition — Heat Transfer Coefficient and bulk fluid (reference) temperature. Exported as `SFE,,CONV,1` and `SFE,,CONV,2` in APDL.
+
+### Kernel-Load Compatibility
+
+Not every kernel can be used with every load type. The kernels are divided into two families based on the direction of the mapping:
+
+| Kernel | Family | Compatible loads |
+|---|---|---|
+| `DISTANCE_WEIGHTED` | Source-to-target | `EM_FORCE` only |
+| `FEM` | Source-to-target | `EM_FORCE` only |
+| `AVERAGE` | Target-to-source | `HEAT_FLUX`, `HEAT_GEN`, `HTC` |
+| `AVERAGE_WEIGHTED` | Target-to-source | `HEAT_FLUX`, `HEAT_GEN`, `HTC` |
+| `CLOSEST` | Target-to-source | `HEAT_FLUX`, `HEAT_GEN`, `HTC` |
+
+Source-to-target kernels distribute each source point's contribution onto its destination neighbours, which is suited to force conservation in EM applications. Target-to-source kernels assign a value to each destination node by aggregating its source neighbours, which is better suited to scalar field interpolation. Using an incompatible combination raises a `ConfigurationError` at construction time.
 
 ## File Format
 
