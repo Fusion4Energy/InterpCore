@@ -1,3 +1,5 @@
+import os
+
 import pytest
 import tempfile
 import shutil
@@ -28,7 +30,7 @@ def sample_config_heat_flux():
         param=1.0,
         max_distance=2.0,
         coincidence_tolerance=1e-6,
-        kernel=INTERPOLATION_KERNEL.DISTANCE_WEIGHTED,
+        kernel=INTERPOLATION_KERNEL.AVERAGE,
         multithread=False,
         interpolated_load=INTERPOLATED_LOAD_TYPE.HEAT_FLUX,
     )
@@ -42,7 +44,7 @@ def sample_config_em_force():
         param=2,
         max_distance=2.0,
         coincidence_tolerance=1e-6,
-        kernel=INTERPOLATION_KERNEL.AVERAGE,
+        kernel=INTERPOLATION_KERNEL.DISTANCE_WEIGHTED,
         multithread=False,
         interpolated_load=INTERPOLATED_LOAD_TYPE.EM_FORCE,
     )
@@ -56,7 +58,7 @@ def sample_config_heat_gen():
         param=3,
         max_distance=2.0,
         coincidence_tolerance=1e-6,
-        kernel=INTERPOLATION_KERNEL.CLOSEST,
+        kernel=INTERPOLATION_KERNEL.AVERAGE,
         multithread=False,
         interpolated_load=INTERPOLATED_LOAD_TYPE.HEAT_GEN,
     )
@@ -70,7 +72,7 @@ def sample_config_htc():
         param=3,
         max_distance=2.0,
         coincidence_tolerance=1e-6,
-        kernel=INTERPOLATION_KERNEL.DISTANCE_WEIGHTED,
+        kernel=INTERPOLATION_KERNEL.AVERAGE,
         multithread=False,
         interpolated_load=INTERPOLATED_LOAD_TYPE.HTC,
     )
@@ -206,6 +208,23 @@ def create_sample_htc_files(temp_dir):
 class TestInterpolator:
     """Tests for Interpolator class"""
 
+    def test_one_file_source(
+        self, create_sample_mesh_files, sample_config_heat_flux, tmpdir
+    ):
+        """Test the interpolate_all method"""
+        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        interpolator = Interpolator(
+            path_to_src_folder=os.path.join(
+                create_sample_mesh_files["src_folder"], "data_001.txt"
+            ),
+            path_to_dest_mesh=create_sample_mesh_files["dest_mesh"],
+            config=sample_config_heat_flux,
+            file_idx=file_idx,
+        )
+
+        interpolator.interpolate_all()
+
+        interpolator.export_to_ansys(tmpdir)
 
     def test_initialization_with_valid_inputs(
         self, create_sample_mesh_files, sample_config_heat_flux

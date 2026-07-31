@@ -79,7 +79,11 @@ class TestKernels:
         vector_interpolated = np.zeros((1, 1))
 
         result = _average_kernel(
-            neighbours_idx, dest_index, vector_to_interp, vector_interpolated, distances=distances
+            neighbours_idx,
+            dest_index,
+            vector_to_interp,
+            vector_interpolated,
+            distances=distances,
         )
 
         assert result is True
@@ -225,7 +229,7 @@ class TestKernels:
         # Destination point far from all sources (dest-to-source mode)
         src_coords = np.array([[0.0, 0.0, 0.0]])
         dest_coords = np.array([[100.0, 100.0, 100.0]])
-        src_values = np.array([[10.0, 20.0, 30.0]])
+        src_values = np.array([[10.0]])
 
         idx_query = np.array([np.array([0])], dtype=object)
 
@@ -236,7 +240,7 @@ class TestKernels:
             method=QUERY_TYPE.K,
             param=1,
             multithread=False,
-            interpolated_load=INTERPOLATED_LOAD_TYPE.EM_FORCE,
+            interpolated_load=INTERPOLATED_LOAD_TYPE.HEAT_GEN,
         )
 
         # Should raise InterpolationError
@@ -255,7 +259,7 @@ class TestKernels:
         # Destination point far from all sources (dest-to-source mode)
         src_coords = np.array([[0.0, 0.0, 0.0]])
         dest_coords = np.array([[100.0, 100.0, 100.0], [0.5, 0.0, 0.0]])
-        src_values = np.array([[10.0, 20.0, 30.0]])
+        src_values = np.array([[10.0]])
 
         idx_query = np.array([np.array([0]), np.array([0])], dtype=object)
 
@@ -266,7 +270,7 @@ class TestKernels:
             method=QUERY_TYPE.K,
             param=1,
             multithread=False,
-            interpolated_load=INTERPOLATED_LOAD_TYPE.EM_FORCE,
+            interpolated_load=INTERPOLATED_LOAD_TYPE.HEAT_GEN,
             accept_no_neighbor=True,  # Accept destinations with no neighbors
         )
 
@@ -280,7 +284,7 @@ class TestKernels:
         )
 
         # First destination (too far) should have zero values
-        np.testing.assert_array_equal(interpolated[0], [0.0, 0.0, 0.0])
+        np.testing.assert_array_equal(interpolated[0], [0.0])
         # Second destination (close enough) should have interpolated values
         assert np.any(interpolated[1] > 0)
         # Nothing should be unmapped in dest-to-source mode
