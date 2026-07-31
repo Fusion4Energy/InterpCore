@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING
 from interpcore.errors import ConfigurationError
+from pathlib import Path
 
 if TYPE_CHECKING:
     from interpcore.kernels import INTERPOLATION_KERNEL
@@ -109,6 +110,34 @@ class InterpolationConfig:
             raise ConfigurationError(
                 f"Incompatible kernel {self.kernel} for load type {self.interpolated_load}"
             )
+
+
+@dataclass
+class ColumnsConfig:
+    """Describe the indices of the columns of both the source file(s) and of the
+    destination mesh file. Indices are 0-based, i.e., the first column has index 0.
+
+    Parameters
+    ----------
+    source_xyz : int
+        Index of the first column containing the x coordinate of the source mesh.
+        y, and z coordinates are expected to be in the next two columns.
+    value : int
+        Index of the column containing the values to be interpolated from the source mesh.
+    dest_xyz : int
+        Index of the first column containing the x coordinate of the destination mesh.
+        y, and z coordinates are expected to be in the next two columns.
+    id : int
+        Index of the column containing the destination mesh node IDs.
+    volume_area : int | None, optional
+        Index of the column containing the volume or area of the destination mesh.
+    """
+
+    source_xyz: int
+    value: int
+    dest_xyz: int
+    id: int
+    volume_area: int | None = None
 
 
 def _is_compatible(

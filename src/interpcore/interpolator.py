@@ -1,4 +1,4 @@
-from interpcore.config import InterpolationConfig, INTERPOLATED_LOAD_TYPE
+from interpcore.config import InterpolationConfig, INTERPOLATED_LOAD_TYPE, ColumnsConfig
 from pathlib import Path
 from interpcore.parsers import parse_mech_mesh, parse_values
 from interpcore.dest_tree import DestinationTree
@@ -16,7 +16,7 @@ class Interpolator:
         path_to_src_folder: str,
         path_to_dest_mesh: str,
         config: InterpolationConfig,
-        file_idx: dict,
+        columns: ColumnsConfig,
     ):
         """Class to handle the interpolation operations
 
@@ -29,20 +29,15 @@ class Interpolator:
             path to the mechanical mesh file
         config : InterpolationConfig
             configuration for the interpolation problem
-        file_idx : dict
-            dictionary with file indices for parsing
+        columns : ColumnsConfig
+            column indices for parsing source and destination files
         """
-        # parse all necessary files
-        if file_idx is None:
-            mesh_data = parse_mech_mesh(Path(path_to_dest_mesh))
-        else:
-            mesh_data = parse_mech_mesh(
-                Path(path_to_dest_mesh),
-                col_mesh_ids=file_idx.get("ids", 0),
-                col_mesh_x=file_idx.get("dest_x", 1),
-                col_vol=file_idx.get("vol", None),
-                col_area=file_idx.get("area", None),
-            )
+        mesh_data = parse_mech_mesh(
+            Path(path_to_dest_mesh),
+            col_mesh_ids=columns.id,
+            col_mesh_x=columns.dest_xyz,
+            col_vol=columns.volume_area,
+        )
 
         mech_x = mesh_data["coordinates"]
         ids = mesh_data["id_numbers"]
@@ -59,7 +54,7 @@ class Interpolator:
             src_coordinates, values = parse_values(
                 file_path,
                 load_type=config.interpolated_load,
-                file_idx=file_idx,
+                columns=columns,
                 n_components=config.num_components,
             )
             src_values[name] = values
@@ -78,7 +73,7 @@ class Interpolator:
                 src_coordinates, values = parse_values(
                     file_path,
                     load_type=config.interpolated_load,
-                    file_idx=file_idx,
+                    columns=columns,
                     n_components=config.num_components,
                 )
                 src_values[name] = values

@@ -8,6 +8,7 @@ from pathlib import Path
 from interpcore.interpolator import Interpolator, _select_template
 from interpcore.config import (
     InterpolationConfig,
+    ColumnsConfig,
     QUERY_TYPE,
     INTERPOLATED_LOAD_TYPE,
     INTERPOLATION_KERNEL,
@@ -212,14 +213,14 @@ class TestInterpolator:
         self, create_sample_mesh_files, sample_config_heat_flux, tmpdir
     ):
         """Test the interpolate_all method"""
-        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        columns = ColumnsConfig(id=0, dest_xyz=1, source_xyz=1, value=4)
         interpolator = Interpolator(
             path_to_src_folder=os.path.join(
                 create_sample_mesh_files["src_folder"], "data_001.txt"
             ),
             path_to_dest_mesh=create_sample_mesh_files["dest_mesh"],
             config=sample_config_heat_flux,
-            file_idx=file_idx,
+            columns=columns,
         )
 
         interpolator.interpolate_all()
@@ -230,12 +231,12 @@ class TestInterpolator:
         self, create_sample_mesh_files, sample_config_heat_flux
     ):
         """Test successful initialization with valid mesh and data files"""
-        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        columns = ColumnsConfig(id=0, dest_xyz=1, source_xyz=1, value=4)
         interpolator = Interpolator(
             path_to_src_folder=create_sample_mesh_files["src_folder"],
             path_to_dest_mesh=create_sample_mesh_files["dest_mesh"],
             config=sample_config_heat_flux,
-            file_idx=file_idx,
+            columns=columns,
         )
 
         assert interpolator is not None
@@ -244,16 +245,16 @@ class TestInterpolator:
         assert "data_001" in interpolator.src_values
         assert interpolator.interpolated_results is None
 
-    def test_initialization_with_custom_file_idx(
+    def test_initialization_with_custom_columns(
         self, create_sample_mesh_files, sample_config_heat_flux
     ):
         """Test initialization with custom file indices"""
-        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        columns = ColumnsConfig(id=0, dest_xyz=1, source_xyz=1, value=4)
         interpolator = Interpolator(
             path_to_src_folder=create_sample_mesh_files["src_folder"],
             path_to_dest_mesh=create_sample_mesh_files["dest_mesh"],
             config=sample_config_heat_flux,
-            file_idx=file_idx,
+            columns=columns,
         )
 
         assert interpolator is not None
@@ -265,14 +266,14 @@ class TestInterpolator:
         """Test that FileNotFoundError is raised when source folder doesn't exist"""
         dest_mesh = temp_dir / "dest.txt"
         dest_mesh.write_text("Node_ID X Y Z\n1 0.0 0.0 0.0\n")
-        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        columns = ColumnsConfig(id=0, dest_xyz=1, source_xyz=1, value=4)
 
         with pytest.raises(FileNotFoundError, match="does not exist"):
             Interpolator(
                 path_to_src_folder=str(temp_dir / "nonexistent"),
                 path_to_dest_mesh=str(dest_mesh),
                 config=sample_config_heat_flux,
-                file_idx=file_idx,
+                columns=columns,
             )
 
     def test_initialization_with_empty_source_folder(
@@ -281,7 +282,7 @@ class TestInterpolator:
         """Test that FileNotFoundError is raised when source folder is empty"""
         dest_mesh = temp_dir / "dest.txt"
         dest_mesh.write_text("Node_ID X Y Z\n1 0.0 0.0 0.0\n")
-        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        columns = ColumnsConfig(id=0, dest_xyz=1, source_xyz=1, value=4)
 
         empty_folder = temp_dir / "empty"
         empty_folder.mkdir()
@@ -291,17 +292,17 @@ class TestInterpolator:
                 path_to_src_folder=str(empty_folder),
                 path_to_dest_mesh=str(dest_mesh),
                 config=sample_config_heat_flux,
-                file_idx=file_idx,
+                columns=columns,
             )
 
     def test_interpolate_all(self, create_sample_mesh_files, sample_config_heat_flux):
         """Test the interpolate_all method"""
-        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        columns = ColumnsConfig(id=0, dest_xyz=1, source_xyz=1, value=4)
         interpolator = Interpolator(
             path_to_src_folder=create_sample_mesh_files["src_folder"],
             path_to_dest_mesh=create_sample_mesh_files["dest_mesh"],
             config=sample_config_heat_flux,
-            file_idx=file_idx,
+            columns=columns,
         )
 
         interpolator.interpolate_all()
@@ -320,12 +321,12 @@ class TestInterpolator:
         self, create_sample_em_force_files, sample_config_em_force
     ):
         """Test interpolation with EM force data (3 components)"""
-        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        columns = ColumnsConfig(id=0, dest_xyz=1, source_xyz=1, value=4)
         interpolator = Interpolator(
             path_to_src_folder=create_sample_em_force_files["src_folder"],
             path_to_dest_mesh=create_sample_em_force_files["dest_mesh"],
             config=sample_config_em_force,
-            file_idx=file_idx,
+            columns=columns,
         )
 
         interpolator.interpolate_all()
@@ -336,12 +337,12 @@ class TestInterpolator:
 
     def test_interpolate_all_with_htc(self, create_sample_htc_files, sample_config_htc):
         """Test interpolation with HTC data (2 components: HTC and Tref)"""
-        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        columns = ColumnsConfig(id=0, dest_xyz=1, source_xyz=1, value=4)
         interpolator = Interpolator(
             path_to_src_folder=create_sample_htc_files["src_folder"],
             path_to_dest_mesh=create_sample_htc_files["dest_mesh"],
             config=sample_config_htc,
-            file_idx=file_idx,
+            columns=columns,
         )
 
         interpolator.interpolate_all()
@@ -357,12 +358,12 @@ class TestInterpolator:
         self, create_sample_mesh_files, sample_config_heat_flux, temp_dir
     ):
         """Test that export raises ValueError when called before interpolation"""
-        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        columns = ColumnsConfig(id=0, dest_xyz=1, source_xyz=1, value=4)
         interpolator = Interpolator(
             path_to_src_folder=create_sample_mesh_files["src_folder"],
             path_to_dest_mesh=create_sample_mesh_files["dest_mesh"],
             config=sample_config_heat_flux,
-            file_idx=file_idx,
+            columns=columns,
         )
 
         output_dir = temp_dir / "output"
@@ -377,12 +378,12 @@ class TestInterpolator:
         self, create_sample_mesh_files, sample_config_heat_flux, temp_dir
     ):
         """Test exporting heat flux results to ANSYS format"""
-        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        columns = ColumnsConfig(id=0, dest_xyz=1, source_xyz=1, value=4)
         interpolator = Interpolator(
             path_to_src_folder=create_sample_mesh_files["src_folder"],
             path_to_dest_mesh=create_sample_mesh_files["dest_mesh"],
             config=sample_config_heat_flux,
-            file_idx=file_idx,
+            columns=columns,
         )
 
         interpolator.interpolate_all()
@@ -405,12 +406,12 @@ class TestInterpolator:
         self, create_sample_em_force_files, sample_config_em_force, temp_dir
     ):
         """Test exporting EM force results to ANSYS format"""
-        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        columns = ColumnsConfig(id=0, dest_xyz=1, source_xyz=1, value=4)
         interpolator = Interpolator(
             path_to_src_folder=create_sample_em_force_files["src_folder"],
             path_to_dest_mesh=create_sample_em_force_files["dest_mesh"],
             config=sample_config_em_force,
-            file_idx=file_idx,
+            columns=columns,
         )
 
         interpolator.interpolate_all()
@@ -433,12 +434,12 @@ class TestInterpolator:
         self, create_sample_heat_gen_files, sample_config_heat_gen, temp_dir
     ):
         """Test exporting heat generation results to ANSYS format"""
-        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        columns = ColumnsConfig(id=0, dest_xyz=1, source_xyz=1, value=4)
         interpolator = Interpolator(
             path_to_src_folder=create_sample_heat_gen_files["src_folder"],
             path_to_dest_mesh=create_sample_heat_gen_files["dest_mesh"],
             config=sample_config_heat_gen,
-            file_idx=file_idx,
+            columns=columns,
         )
 
         interpolator.interpolate_all()
@@ -461,12 +462,12 @@ class TestInterpolator:
         self, create_sample_htc_files, sample_config_htc, temp_dir
     ):
         """Test exporting HTC results to ANSYS format"""
-        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        columns = ColumnsConfig(id=0, dest_xyz=1, source_xyz=1, value=4)
         interpolator = Interpolator(
             path_to_src_folder=create_sample_htc_files["src_folder"],
             path_to_dest_mesh=create_sample_htc_files["dest_mesh"],
             config=sample_config_htc,
-            file_idx=file_idx,
+            columns=columns,
         )
 
         interpolator.interpolate_all()
@@ -489,12 +490,12 @@ class TestInterpolator:
         self, create_sample_mesh_files, sample_config_heat_flux
     ):
         """Test that build_vtk_output raises ValueError when called before interpolation"""
-        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        columns = ColumnsConfig(id=0, dest_xyz=1, source_xyz=1, value=4)
         interpolator = Interpolator(
             path_to_src_folder=create_sample_mesh_files["src_folder"],
             path_to_dest_mesh=create_sample_mesh_files["dest_mesh"],
             config=sample_config_heat_flux,
-            file_idx=file_idx,
+            columns=columns,
         )
 
         with pytest.raises(
@@ -506,12 +507,12 @@ class TestInterpolator:
         self, create_sample_mesh_files, sample_config_heat_flux
     ):
         """Test building VTK output without saving to disk"""
-        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        columns = ColumnsConfig(id=0, dest_xyz=1, source_xyz=1, value=4)
         interpolator = Interpolator(
             path_to_src_folder=create_sample_mesh_files["src_folder"],
             path_to_dest_mesh=create_sample_mesh_files["dest_mesh"],
             config=sample_config_heat_flux,
-            file_idx=file_idx,
+            columns=columns,
         )
 
         interpolator.interpolate_all()
@@ -527,12 +528,12 @@ class TestInterpolator:
         self, create_sample_mesh_files, sample_config_heat_flux, temp_dir
     ):
         """Test building and saving VTK output to disk"""
-        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        columns = ColumnsConfig(id=0, dest_xyz=1, source_xyz=1, value=4)
         interpolator = Interpolator(
             path_to_src_folder=create_sample_mesh_files["src_folder"],
             path_to_dest_mesh=create_sample_mesh_files["dest_mesh"],
             config=sample_config_heat_flux,
-            file_idx=file_idx,
+            columns=columns,
         )
 
         interpolator.interpolate_all()
@@ -571,12 +572,12 @@ class TestInterpolator:
 """
             src_file.write_text(src_content)
 
-        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        columns = ColumnsConfig(id=0, dest_xyz=1, source_xyz=1, value=4)
         interpolator = Interpolator(
             path_to_src_folder=str(src_folder),
             path_to_dest_mesh=str(dest_mesh),
             config=sample_config_heat_flux,
-            file_idx=file_idx,
+            columns=columns,
         )
 
         assert len(interpolator.src_values) == 3
@@ -609,12 +610,12 @@ class TestInterpolator:
         src_file.write_text(src_content)
 
         # Create interpolator with volume data
-        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4, "vol": 4}
+        columns = ColumnsConfig(id=0, dest_xyz=1, source_xyz=1, value=4, volume_area=4)
         interpolator = Interpolator(
             path_to_src_folder=str(src_folder),
             path_to_dest_mesh=str(dest_mesh),
             config=sample_config_heat_gen,
-            file_idx=file_idx,
+            columns=columns,
         )
 
         # Run interpolation
@@ -634,12 +635,12 @@ class TestInterpolator:
         self, create_sample_heat_gen_files, sample_config_heat_gen
     ):
         """Test that compute_scalar_integrals raises ValueError before interpolation"""
-        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        columns = ColumnsConfig(id=0, dest_xyz=1, source_xyz=1, value=4)
         interpolator = Interpolator(
             path_to_src_folder=create_sample_heat_gen_files["src_folder"],
             path_to_dest_mesh=create_sample_heat_gen_files["dest_mesh"],
             config=sample_config_heat_gen,
-            file_idx=file_idx,
+            columns=columns,
         )
 
         with pytest.raises(
@@ -651,12 +652,12 @@ class TestInterpolator:
         self, create_sample_em_force_files, sample_config_em_force
     ):
         """Test computing EM force and moment resultants"""
-        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        columns = ColumnsConfig(id=0, dest_xyz=1, source_xyz=1, value=4)
         interpolator = Interpolator(
             path_to_src_folder=create_sample_em_force_files["src_folder"],
             path_to_dest_mesh=create_sample_em_force_files["dest_mesh"],
             config=sample_config_em_force,
-            file_idx=file_idx,
+            columns=columns,
         )
 
         # Run interpolation
@@ -692,12 +693,12 @@ class TestInterpolator:
         self, create_sample_em_force_files, sample_config_em_force
     ):
         """Test computing EM resultants with custom reference pole"""
-        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        columns = ColumnsConfig(id=0, dest_xyz=1, source_xyz=1, value=4)
         interpolator = Interpolator(
             path_to_src_folder=create_sample_em_force_files["src_folder"],
             path_to_dest_mesh=create_sample_em_force_files["dest_mesh"],
             config=sample_config_em_force,
-            file_idx=file_idx,
+            columns=columns,
         )
 
         interpolator.interpolate_all()
@@ -718,12 +719,12 @@ class TestInterpolator:
         self, create_sample_em_force_files, sample_config_em_force
     ):
         """Test that compute_EM_resultants raises ValueError before interpolation"""
-        file_idx = {"ids": 0, "dest_x": 1, "src_x": 1, "val": 4}
+        columns = ColumnsConfig(id=0, dest_xyz=1, source_xyz=1, value=4)
         interpolator = Interpolator(
             path_to_src_folder=create_sample_em_force_files["src_folder"],
             path_to_dest_mesh=create_sample_em_force_files["dest_mesh"],
             config=sample_config_em_force,
-            file_idx=file_idx,
+            columns=columns,
         )
 
         with pytest.raises(
