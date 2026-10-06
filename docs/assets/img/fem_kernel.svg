@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 380" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15">
+  <defs>
+    <path id="spring" d="M0,0 L25,0 L29,-10 L37,10 L45,-10 L53,10 L61,-10 L69,10 L75,0 L100,0"
+          fill="none" stroke="#555" stroke-width="2" vector-effect="non-scaling-stroke"/>
+    <marker id="arrF" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#bf360c"/>
+    </marker>
+    <marker id="arrR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3f51b5"/>
+    </marker>
+  </defs>
+  <rect x="2" y="2" width="596" height="376" rx="12" fill="#ffffff" stroke="#ccc"/>
+
+  <!-- springs from source (300,170) to nodes -->
+  <use href="#spring" transform="translate(300,170) rotate(206.6) scale(2.01,1)"/>
+  <use href="#spring" transform="translate(300,170) rotate(-24.0) scale(1.97,1)"/>
+  <use href="#spring" transform="translate(300,170) rotate(93.8) scale(1.503,1)"/>
+
+  <!-- fixed destination nodes -->
+  <g fill="#3f51b5">
+    <rect x="110" y="70" width="20" height="20"/>
+    <rect x="470" y="80" width="20" height="20"/>
+    <rect x="280" y="310" width="20" height="20"/>
+  </g>
+  <g stroke="#3f51b5" stroke-width="1.5">
+    <path d="M100,62 L140,62 M104,62 L98,54 M114,62 L108,54 M124,62 L118,54 M134,62 L128,54"/>
+    <path d="M460,72 L500,72 M464,72 L458,64 M474,72 L468,64 M484,72 L478,64 M494,72 L488,64"/>
+    <path d="M270,338 L310,338 M274,338 L268,346 M284,338 L278,346 M294,338 L288,346 M304,338 L298,346"/>
+  </g>
+
+  <!-- reactions -->
+  <line x1="120" y1="80" x2="82" y2="61" stroke="#3f51b5" stroke-width="2.5" marker-end="url(#arrR)"/>
+  <text x="58" y="104" fill="#3f51b5" font-style="italic">F₁ = K₁u</text>
+  <line x1="480" y1="90" x2="520" y2="72" stroke="#3f51b5" stroke-width="2.5" marker-end="url(#arrR)"/>
+  <text x="470" y="125" fill="#3f51b5" font-style="italic">F₂ = K₂u</text>
+  <line x1="290" y1="320" x2="292" y2="362" stroke="#3f51b5" stroke-width="2.5" marker-end="url(#arrR)"/>
+  <text x="310" y="360" fill="#3f51b5" font-style="italic">F₃ = K₃u</text>
+
+  <!-- source point and applied force -->
+  <line x1="300" y1="170" x2="380" y2="215" stroke="#bf360c" stroke-width="3" marker-end="url(#arrF)"/>
+  <text x="388" y="232" fill="#bf360c" font-weight="bold">F</text>
+  <circle cx="300" cy="170" r="10" fill="#ff7043" stroke="#bf360c" stroke-width="1.5"/>
+
+  <text x="200" y="190" fill="#555" font-style="italic">kᵢ ∝ 1/dᵢ</text>
+  <text x="20" y="30" fill="#333">Source point loaded by F, springs to fixed destination nodes</text>
+</svg>

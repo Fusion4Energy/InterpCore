@@ -326,6 +326,32 @@ class TestKernels:
         # Nothing should be unmapped
         assert np.all(unmapped == 0)
 
+    def test_radius_query_coincident_node_not_first_in_tree(self):
+        """Radius query must detect a coincident node even if it is not the first found"""
+        src_coords = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]])
+        dest_coords = np.array([[1.0001, 0.0, 0.0]])
+        src_values = np.array([[10.0], [20.0], [90.0]])
+
+        config = InterpolationConfig(
+            kernel=INTERPOLATION_KERNEL.AVERAGE,
+            max_distance=5.0,
+            coincidence_tolerance=0.01,
+            method=QUERY_TYPE.RADIUS,
+            param=1.5,
+            multithread=False,
+            interpolated_load=INTERPOLATED_LOAD_TYPE.HEAT_FLUX,
+        )
+        tree = DestinationTree(
+            dest_coordinates=dest_coords,
+            src_coordinates=src_coords,
+            dest_ids=np.array([1]),
+            config=config,
+        )
+        interpolated, _ = tree.interpolate(src_values)
+
+        # Coincident with src[1]: value copied, not averaged with the other neighbours
+        np.testing.assert_almost_equal(interpolated[0, 0], 20.0)
+
     def test_destination_to_source_multithread_handles_empty_blocks(self, monkeypatch):
         """Dest-to-source multithread should handle blocks larger than points without shape errors"""
         dest_coords = np.array([[0.0, 0.0, 0.0], [10.0, 0.0, 0.0]])

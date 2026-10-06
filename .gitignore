@@ -3,3 +3,10 @@ __pycache__/
 .vscode/
 interpcore.egg-info
 _version.py
+
+# documentation build
+site/
+.cache/
+# generated from the notebooks by nbconvert at build time
+docs/examples/*/*.md
+docs/examples/*/*_files/
