@@ -1,0 +1,9 @@
+/* Diagrams: keep SVGs readable in both light and dark schemes */
+.md-typeset img.diagram {
+  display: block;
+  margin: 1em auto;
+  max-width: 100%;
+  background: #ffffff;
+  border-radius: 0.4rem;
+  padding: 0.6rem;
+}

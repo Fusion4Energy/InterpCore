@@ -92,7 +92,10 @@ class DestinationTree:
         logging.info("Extracting nodes from KDTree...")
         tic = time.perf_counter()
         if method == QUERY_TYPE.RADIUS:
-            idx = dest_tree.query_radius(src_coordinates, r=param)
+            # sorted so that the first neighbour is the closest (coincidence check)
+            idx = dest_tree.query_radius(
+                src_coordinates, r=param, return_distance=True, sort_results=True
+            )[0]
         elif method == QUERY_TYPE.K:
             # check for int already done in config
             idx = dest_tree.query(src_coordinates, k=int(param))[1]

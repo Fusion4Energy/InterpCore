@@ -1,0 +1,148 @@
+[project]
+site_url = "https://fusion4energy.github.io/InterpCore/"
+site_name = "InterpCore"
+site_description = "Interpolation of physical field data between meshes with export to ANSYS APDL"
+site_author = "F4E mechanical team"
+copyright = "Licensed under the EUPL 1.2 &mdash; F4E mechanical team"
+
+repo_url = "https://github.com/Fusion4Energy/InterpCore"
+repo_name = "Fusion4Energy/InterpCore"
+edit_uri = "edit/main/docs/"
+
+docs_dir = "docs"
+site_dir = "site"
+
+nav = [
+  { "Home" = "index.md" },
+  { "Getting started" = [
+    "installation.md",
+    "getting-started.md",
+  ] },
+  { "User guide" = [
+    "user-guide/how-it-works.md",
+    "user-guide/configuration.md",
+    "user-guide/query-methods.md",
+    "user-guide/kernels.md",
+    "user-guide/load-types.md",
+    "user-guide/analysis.md",
+    "user-guide/file-formats.md",
+  ] },
+  { "Examples" = [
+    "examples/index.md",
+    { "Heat flux" = "examples/heat_flux/heat_flux.md" },
+    { "Heat generation" = "examples/heat_gen/heat_gen.md" },
+    { "EM force" = "examples/em_force/em_force.md" },
+    { "HTC" = "examples/htc/htc.md" },
+  ] },
+  { "API reference" = [
+    "api/interpolator.md",
+    "api/config.md",
+    "api/dest_tree.md",
+    "api/kernels.md",
+    "api/parsers.md",
+    "api/errors.md",
+  ] },
+]
+
+extra_css = [
+  "stylesheets/extra.css",
+  "https://unpkg.com/katex@0/dist/katex.min.css",
+]
+extra_javascript = [
+  "javascripts/katex.js",
+  "https://unpkg.com/katex@0/dist/katex.min.js",
+  "https://unpkg.com/katex@0/dist/contrib/auto-render.min.js",
+]
+
+[project.theme]
+language = "en"
+features = [
+  "content.action.edit",
+  "content.code.annotate",
+  "content.code.copy",
+  "content.code.select",
+  "content.tabs.link",
+  "content.tooltips",
+  "navigation.footer",
+  "navigation.indexes",
+  "navigation.instant",
+  "navigation.path",
+  "navigation.sections",
+  "navigation.tabs",
+  "navigation.top",
+  "navigation.tracking",
+  "search.highlight",
+]
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme)"
+toggle.icon = "lucide/sun-moon"
+toggle.name = "Switch to light mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+primary = "indigo"
+accent = "deep orange"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+primary = "indigo"
+accent = "deep orange"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to system preference"
+
+[[project.extra.social]]
+icon = "fontawesome/brands/github"
+link = "https://github.com/Fusion4Energy/InterpCore"
+
+[project.markdown_extensions]
+abbr = {}
+admonition = {}
+attr_list = {}
+def_list = {}
+footnotes = {}
+md_in_html = {}
+tables = {}
+toc.permalink = true
+pymdownx.arithmatex.generic = true
+pymdownx.betterem = {}
+pymdownx.caret = {}
+pymdownx.details = {}
+pymdownx.emoji.emoji_generator = "zensical.extensions.emoji.to_svg"
+pymdownx.emoji.emoji_index = "zensical.extensions.emoji.twemoji"
+pymdownx.highlight.anchor_linenums = true
+pymdownx.highlight.line_spans = "__span"
+pymdownx.highlight.pygments_lang_class = true
+pymdownx.inlinehilite = {}
+pymdownx.keys = {}
+pymdownx.magiclink = {}
+pymdownx.mark = {}
+pymdownx.smartsymbols = {}
+pymdownx.superfences.custom_fences = [
+  { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" },
+]
+pymdownx.tabbed.alternate_style = true
+pymdownx.tabbed.combine_header_slug = true
+pymdownx.tasklist.custom_checkbox = true
+pymdownx.tilde = {}
+
+[project.plugins.mkdocstrings.handlers.python]
+paths = ["src"]
+
+[project.plugins.mkdocstrings.handlers.python.options]
+docstring_style = "numpy"
+show_source = true
+show_root_heading = true
+show_root_full_path = false
+show_symbol_type_heading = true
+show_symbol_type_toc = true
+members_order = "source"
+merge_init_into_class = true
+separate_signature = true
+show_signature_annotations = true
+signature_crossrefs = true
+filters = ["!^_"]

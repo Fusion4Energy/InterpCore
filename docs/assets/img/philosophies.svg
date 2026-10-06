@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 340" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#555"/>
+    </marker>
+  </defs>
+
+  <!-- Left panel: source-to-target -->
+  <rect x="10" y="10" width="390" height="320" rx="12" fill="#f5f7ff" stroke="#3f51b5" stroke-width="1.5"/>
+  <text x="205" y="38" text-anchor="middle" font-size="17" font-weight="bold" fill="#3f51b5">Source-to-target</text>
+  <text x="205" y="58" text-anchor="middle" fill="#333">one source value is distributed</text>
+
+  <line x1="205" y1="185" x2="98" y2="110" stroke="#555" stroke-width="2" marker-end="url(#arr)"/>
+  <line x1="205" y1="185" x2="318" y2="118" stroke="#555" stroke-width="2" marker-end="url(#arr)"/>
+  <line x1="205" y1="185" x2="110" y2="268" stroke="#555" stroke-width="2" marker-end="url(#arr)"/>
+  <line x1="205" y1="185" x2="300" y2="262" stroke="#555" stroke-width="2" marker-end="url(#arr)"/>
+
+  <rect x="78" y="92" width="18" height="18" fill="#3f51b5"/>
+  <rect x="320" y="102" width="18" height="18" fill="#3f51b5"/>
+  <rect x="94" y="268" width="18" height="18" fill="#3f51b5"/>
+  <rect x="300" y="262" width="18" height="18" fill="#3f51b5"/>
+
+  <circle cx="205" cy="185" r="11" fill="#ff7043" stroke="#bf360c" stroke-width="1.5"/>
+  <text x="225" y="182" fill="#bf360c" font-weight="bold">F</text>
+
+  <text x="135" y="138" fill="#333" font-style="italic">w₁F</text>
+  <text x="262" y="140" fill="#333" font-style="italic">w₂F</text>
+  <text x="128" y="238" fill="#333" font-style="italic">w₃F</text>
+  <text x="262" y="236" fill="#333" font-style="italic">w₄F</text>
+
+  <text x="205" y="315" text-anchor="middle" fill="#333">Σ wᵢ = 1  →  total force conserved</text>
+
+  <!-- Right panel: target-to-source -->
+  <rect x="420" y="10" width="390" height="320" rx="12" fill="#fff7f3" stroke="#e64a19" stroke-width="1.5"/>
+  <text x="615" y="38" text-anchor="middle" font-size="17" font-weight="bold" fill="#e64a19">Target-to-source</text>
+  <text x="615" y="58" text-anchor="middle" fill="#333">one destination value is assigned</text>
+
+  <line x1="508" y1="108" x2="602" y2="176" stroke="#555" stroke-width="2" marker-end="url(#arr)"/>
+  <line x1="730" y1="115" x2="628" y2="176" stroke="#555" stroke-width="2" marker-end="url(#arr)"/>
+  <line x1="515" y1="272" x2="603" y2="198" stroke="#555" stroke-width="2" marker-end="url(#arr)"/>
+  <line x1="718" y1="266" x2="628" y2="198" stroke="#555" stroke-width="2" marker-end="url(#arr)"/>
+
+  <circle cx="500" cy="102" r="10" fill="#ff7043" stroke="#bf360c" stroke-width="1.5"/>
+  <circle cx="738" cy="110" r="10" fill="#ff7043" stroke="#bf360c" stroke-width="1.5"/>
+  <circle cx="507" cy="278" r="10" fill="#ff7043" stroke="#bf360c" stroke-width="1.5"/>
+  <circle cx="726" cy="272" r="10" fill="#ff7043" stroke="#bf360c" stroke-width="1.5"/>
+  <text x="480" y="88" fill="#bf360c" font-style="italic">q₁</text>
+  <text x="750" y="98" fill="#bf360c" font-style="italic">q₂</text>
+  <text x="482" y="302" fill="#bf360c" font-style="italic">q₃</text>
+  <text x="742" y="296" fill="#bf360c" font-style="italic">q₄</text>
+
+  <rect x="604" y="176" width="22" height="22" fill="#3f51b5"/>
+  <text x="636" y="218" fill="#3f51b5" font-weight="bold">q = f(q₁…q₄)</text>
+
+  <text x="615" y="315" text-anchor="middle" fill="#333">average, weighted average or closest</text>
+</svg>

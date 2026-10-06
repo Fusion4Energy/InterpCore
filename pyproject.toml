@@ -27,11 +27,11 @@ dependencies = [
 ]
 [project.optional-dependencies]
 dev = ["pytest", "pytest-cov", "ruff"]
+docs = ["zensical", "mkdocstrings-python", "nbconvert"]
 
 [project.urls]
-# Homepage = "https://github.com/Fusion4Energy"
-# Repository = "https://github.com/Fusion4Energy/EM-interpolator"
-# Documentation = "https://github.com/Fusion4Energy/EM-interpolator"
+Repository = "https://github.com/Fusion4Energy/InterpCore"
+Documentation = "https://fusion4energy.github.io/InterpCore/"
 
 [tool.setuptools_scm]
 write_to = "src/_version.py"

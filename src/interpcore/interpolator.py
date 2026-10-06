@@ -234,7 +234,7 @@ class Interpolator:
 
         Parameters
         ----------
-        oiutdir : Path | None, optional
+        outdir : Path | None, optional
             output directory for the vtk files, if None, files are not saved, by default None
 
         """
